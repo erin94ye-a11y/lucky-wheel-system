@@ -98,23 +98,24 @@ test("public page keeps the code entry flow and removes the unused reward intro"
   });
   assert.equal(page.status, 200);
   assert.match(page.body, /CryptoReward/);
-  assert.match(page.body, /winnerFeed/);
-  assert.match(page.body, /中奖动态/);
   assert.match(page.body, /输入抽奖代码/);
   assert.doesNotMatch(page.body, /reward-kicker/);
   assert.doesNotMatch(page.body, /stats-strip/);
   assert.doesNotMatch(page.body, /ticket-preview/);
   assert.doesNotMatch(page.body, /累计天数/);
   assert.doesNotMatch(page.body, /本次奖品/);
+  assert.doesNotMatch(page.body, /winnerFeed/);
+  assert.doesNotMatch(page.body, /中奖动态/);
+  assert.doesNotMatch(page.body, /中奖播报/);
 
   const script = await server.request("/app.js", {
     headers: { accept: "text/javascript" }
   });
   assert.equal(script.status, 200);
-  assert.match(script.body, /renderWinnerFeed/);
-  assert.match(script.body, /winner-code/);
-  assert.match(script.body, /winner-prize/);
-  assert.match(script.body, /winner-time/);
+  assert.doesNotMatch(script.body, /renderWinnerFeed/);
+  assert.doesNotMatch(script.body, /winner-code/);
+  assert.doesNotMatch(script.body, /winner-prize/);
+  assert.doesNotMatch(script.body, /winner-time/);
 });
 
 test("admin mode serves the login page separately and hides public APIs", async (t) => {

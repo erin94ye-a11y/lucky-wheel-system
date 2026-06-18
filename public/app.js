@@ -8,8 +8,6 @@ const spinButton = document.querySelector("#spinButton");
 const campaignCode = document.querySelector("#campaignCode");
 const campaignTitle = document.querySelector("#campaignTitle");
 const campaignMeta = document.querySelector("#campaignMeta");
-const winnerFeed = document.querySelector("#winnerFeed");
-const winnerCount = document.querySelector("#winnerCount");
 const resultPanel = document.querySelector("#resultPanel");
 const resultImage = document.querySelector("#resultImage");
 const resultName = document.querySelector("#resultName");
@@ -114,7 +112,6 @@ function renderStaticPrizePool(prizes) {
   spinButton.disabled = true;
   spinButton.textContent = "输入代码";
   renderWheel(prizes);
-  renderWinnerFeed(prizes);
 }
 
 function renderCampaign(campaign) {
@@ -131,7 +128,6 @@ function renderCampaign(campaign) {
 
   const prizes = campaign.prizes.length ? campaign.prizes : [{ name: "暂无奖品" }];
   renderWheel(prizes);
-  renderWinnerFeed(prizes);
 }
 
 function renderWheel(prizes) {
@@ -172,45 +168,6 @@ function renderWheel(prizes) {
   });
 }
 
-function renderWinnerFeed(prizes) {
-  const records = createWinnerRecords(prizes);
-  winnerCount.textContent = `${records.length} 条`;
-  winnerFeed.innerHTML = "";
-
-  [...records, ...records].forEach((record, index) => {
-    const item = document.createElement("div");
-    item.className = "winner-item";
-    item.style.setProperty("--item-color", segmentColors[index % segmentColors.length]);
-    item.innerHTML = `
-      <div class="winner-icon">${escapeHtml(record.prize.slice(0, 1))}</div>
-      <div class="winner-main">
-        <span class="winner-label">中奖代码</span>
-        <strong class="winner-code">${escapeHtml(record.code)}</strong>
-      </div>
-      <div class="winner-main">
-        <span class="winner-label">中奖奖品</span>
-        <strong class="winner-prize">${escapeHtml(record.prize)}</strong>
-      </div>
-      <time class="winner-time">${escapeHtml(record.time)}</time>
-    `;
-    winnerFeed.append(item);
-  });
-}
-
-function createWinnerRecords(prizes) {
-  const pool = prizes.length ? prizes : defaultPrizePool();
-  const now = new Date();
-  return pool.slice(0, 9).map((prize, index) => {
-    const minutesAgo = 3 + index * 7;
-    const time = new Date(now.getTime() - minutesAgo * 60 * 1000);
-    return {
-      code: `CR${String(7300 + index * 47).padStart(4, "0")}****${index + 1}`,
-      prize: prize.name,
-      time: time.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false })
-    };
-  });
-}
-
 function spinToPrize(prize, updatedCampaign) {
   const prizes = activeCampaign.prizes;
   const selectedIndex = Math.max(
@@ -245,15 +202,6 @@ function spinToPrize(prize, updatedCampaign) {
 function setMessage(text, type) {
   message.textContent = text;
   message.className = `form-message ${type || ""}`.trim();
-}
-
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
 }
 
 function defaultPrizePool() {
