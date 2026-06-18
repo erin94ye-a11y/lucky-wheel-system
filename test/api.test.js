@@ -72,6 +72,35 @@ test("admin mode serves the login page separately and hides public APIs", async 
   assert.equal(publicApi.status, 404);
 });
 
+test("admin can generate an unused lottery code", async (t) => {
+  const server = startTestServer({ mode: "admin" });
+  t.after(server.close);
+
+  const denied = await server.request("/api/admin/codes/generate");
+  assert.equal(denied.status, 401);
+
+  await server.request("/api/admin/login", {
+    method: "POST",
+    body: JSON.stringify({ username: "admin", password: "admin" })
+  });
+
+  await server.request("/api/admin/campaigns", {
+    method: "POST",
+    body: JSON.stringify({
+      code: "ABCDEFGH",
+      title: "Existing Code",
+      max_uses: 1,
+      active: true,
+      prizes: [{ name: "Prize", probability: 100, stock: 1 }]
+    })
+  });
+
+  const generated = await server.request("/api/admin/codes/generate");
+  assert.equal(generated.status, 200);
+  assert.match(generated.body.code, /^[A-Z0-9]{8}$/);
+  assert.notEqual(generated.body.code, "ABCDEFGH");
+});
+
 test("admin creates a campaign and public users can draw with IP logging", async (t) => {
   const server = startTestServer();
   t.after(server.close);

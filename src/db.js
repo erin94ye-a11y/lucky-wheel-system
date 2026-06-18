@@ -103,6 +103,10 @@ export function updateCampaign(db, id, input) {
   return saveCampaign(db, id, input);
 }
 
+export function generateCampaignCode(db) {
+  return ensureUniqueCode(db, null);
+}
+
 function saveCampaign(db, id, input) {
   const transaction = db.transaction(() => {
     const existing = id ? getCampaignById(db, id) : null;

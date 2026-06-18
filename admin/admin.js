@@ -11,6 +11,7 @@ const editorTitle = document.querySelector("#editorTitle");
 const saveState = document.querySelector("#saveState");
 const campaignTitleInput = document.querySelector("#campaignTitleInput");
 const campaignCodeInput = document.querySelector("#campaignCodeInput");
+const generateCodeButton = document.querySelector("#generateCodeButton");
 const maxUsesInput = document.querySelector("#maxUsesInput");
 const expiresInput = document.querySelector("#expiresInput");
 const activeInput = document.querySelector("#activeInput");
@@ -57,6 +58,20 @@ resetFormButton.addEventListener("click", resetForm);
 
 addPrizeButton.addEventListener("click", () => {
   addPrizeRow({ name: "", probability: 10, stock: "", image_url: "" });
+});
+
+generateCodeButton.addEventListener("click", async () => {
+  saveState.textContent = "正在生成代码...";
+  saveState.style.color = "#667085";
+  const response = await api("/api/admin/codes/generate");
+  if (response.ok) {
+    campaignCodeInput.value = response.code;
+    saveState.textContent = "代码已生成";
+    saveState.style.color = "#078f8a";
+  } else {
+    saveState.textContent = response.error || "代码生成失败";
+    saveState.style.color = "#bd2440";
+  }
 });
 
 campaignForm.addEventListener("submit", async (event) => {

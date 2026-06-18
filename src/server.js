@@ -8,6 +8,7 @@ import multer from "multer";
 
 import {
   createCampaign,
+  generateCampaignCode,
   getCampaignByCode,
   listCampaigns,
   listDraws,
@@ -114,6 +115,10 @@ export function createApp(options = {}) {
 
     app.get("/api/admin/campaigns", requireAdmin(sessionSecret), (_request, response) => {
       response.json({ campaigns: listCampaigns(db) });
+    });
+
+    app.get("/api/admin/codes/generate", requireAdmin(sessionSecret), (_request, response) => {
+      response.json({ code: generateCampaignCode(db) });
     });
 
     app.post("/api/admin/campaigns", requireAdmin(sessionSecret), (request, response, next) => {

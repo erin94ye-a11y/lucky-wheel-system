@@ -12,13 +12,24 @@
         <span class="brand-mark">奖</span>
         <span>活动转盘</span>
       </a>
+      <div class="topbar-note">
+        <span></span>
+        <strong>服务器实时判定</strong>
+      </div>
     </header>
 
     <main class="public-shell">
       <section class="entry-panel" id="entryPanel">
-        <div>
+        <div class="entry-copy">
           <h1>输入抽奖代码</h1>
-          <p>提交后系统会校验代码，并由服务器计算中奖结果。</p>
+          <p>输入活动方发放的专属代码，确认资格后开启转盘。奖品、库存和结果都会从活动系统实时同步。</p>
+        </div>
+        <div class="ticket-preview" aria-hidden="true">
+          <div>
+            <span>Lucky Pass</span>
+            <strong>活动抽奖券</strong>
+          </div>
+          <p>CODE</p>
         </div>
         <form id="codeForm" class="code-form">
           <input
@@ -31,10 +42,50 @@
           />
           <button type="submit">确认代码</button>
         </form>
+        <div class="process-strip" aria-label="抽奖流程">
+          <div>
+            <span>1</span>
+            <strong>输入代码</strong>
+          </div>
+          <div>
+            <span>2</span>
+            <strong>确认资格</strong>
+          </div>
+          <div>
+            <span>3</span>
+            <strong>开始抽奖</strong>
+          </div>
+        </div>
         <p class="privacy-note">
           参与抽奖会记录服务器可见 IP、转发 IP 和浏览器信息，用于活动核验和异常排查。
         </p>
         <p class="form-message" id="message" role="status"></p>
+      </section>
+
+      <section class="welcome-stage" id="welcomeStage">
+        <div class="welcome-card">
+          <div class="mini-wheel" aria-hidden="true">
+            <span></span>
+          </div>
+          <div>
+            <h2>好运正在等待入场</h2>
+            <p>确认代码后，这里会展示当前活动转盘、奖品池和剩余抽奖次数。</p>
+          </div>
+        </div>
+        <div class="comfort-grid">
+          <div>
+            <strong>奖品池</strong>
+            <span>后台实时配置</span>
+          </div>
+          <div>
+            <strong>抽奖记录</strong>
+            <span>结果自动留存</span>
+          </div>
+          <div>
+            <strong>次数核验</strong>
+            <span>防止重复使用</span>
+          </div>
+        </div>
       </section>
 
       <section class="wheel-stage is-hidden" id="wheelStage" aria-live="polite">
@@ -48,6 +99,13 @@
           <div class="wheel" id="wheel"></div>
           <button class="spin-button" id="spinButton" type="button">开始抽奖</button>
         </div>
+        <aside class="prize-preview-panel">
+          <div class="prize-preview-title">
+            <h3>本次奖品</h3>
+            <span id="prizeCount"></span>
+          </div>
+          <div class="prize-preview-grid" id="prizePreview"></div>
+        </aside>
         <div class="result-panel is-hidden" id="resultPanel">
           <img id="resultImage" alt="" />
           <div>

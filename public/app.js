@@ -1,12 +1,15 @@
 const codeForm = document.querySelector("#codeForm");
 const codeInput = document.querySelector("#codeInput");
 const message = document.querySelector("#message");
+const welcomeStage = document.querySelector("#welcomeStage");
 const wheelStage = document.querySelector("#wheelStage");
 const wheel = document.querySelector("#wheel");
 const spinButton = document.querySelector("#spinButton");
 const campaignCode = document.querySelector("#campaignCode");
 const campaignTitle = document.querySelector("#campaignTitle");
 const campaignMeta = document.querySelector("#campaignMeta");
+const prizePreview = document.querySelector("#prizePreview");
+const prizeCount = document.querySelector("#prizeCount");
 const resultPanel = document.querySelector("#resultPanel");
 const resultImage = document.querySelector("#resultImage");
 const resultName = document.querySelector("#resultName");
@@ -35,6 +38,7 @@ codeForm.addEventListener("submit", async (event) => {
     setMessage("代码有效，可以开始抽奖。", "success");
   } catch (error) {
     wheelStage.classList.add("is-hidden");
+    welcomeStage.classList.remove("is-hidden");
     setMessage(error.message, "error");
   }
 });
@@ -76,14 +80,18 @@ spinButton.addEventListener("click", async () => {
 
 function renderCampaign(campaign) {
   activeCampaign = campaign;
+  const remaining = Math.max(0, campaign.max_uses - campaign.used_count);
   campaignCode.textContent = `抽奖代码 ${campaign.code}`;
   campaignTitle.textContent = campaign.title;
-  campaignMeta.textContent = `剩余次数 ${Math.max(0, campaign.max_uses - campaign.used_count)} / ${campaign.max_uses}`;
+  campaignMeta.textContent = `剩余次数 ${remaining} / ${campaign.max_uses}`;
+  welcomeStage.classList.add("is-hidden");
   wheelStage.classList.remove("is-hidden");
-  spinButton.disabled = false;
+  spinButton.disabled = remaining <= 0;
+  spinButton.textContent = remaining <= 0 ? "次数已用完" : "开始抽奖";
   isSpinning = false;
 
   const prizes = campaign.prizes.length ? campaign.prizes : [{ name: "暂无奖品" }];
+  renderPrizePreview(prizes);
   const slice = 360 / prizes.length;
   const gradient = prizes
     .map((_, index) => {
@@ -113,6 +121,38 @@ function renderCampaign(campaign) {
     name.textContent = prize.name;
     label.append(name);
     wheel.append(label);
+  });
+}
+
+function renderPrizePreview(prizes) {
+  prizeCount.textContent = `${prizes.length} 项`;
+  prizePreview.innerHTML = "";
+
+  prizes.forEach((prize, index) => {
+    const item = document.createElement("div");
+    item.className = "prize-preview-item";
+
+    const thumb = document.createElement("div");
+    thumb.className = "prize-thumb";
+    thumb.style.background = segmentColors[index % segmentColors.length];
+
+    if (prize.image_url) {
+      const image = document.createElement("img");
+      image.src = prize.image_url;
+      image.alt = "";
+      thumb.append(image);
+    } else {
+      thumb.textContent = prize.name.slice(0, 1);
+    }
+
+    const detail = document.createElement("div");
+    const name = document.createElement("strong");
+    name.textContent = prize.name;
+    const stock = document.createElement("span");
+    stock.textContent = prize.available === null ? "库存不限" : `剩余 ${prize.available}`;
+    detail.append(name, stock);
+    item.append(thumb, detail);
+    prizePreview.append(item);
   });
 }
 
