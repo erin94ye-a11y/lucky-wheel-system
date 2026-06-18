@@ -6,14 +6,15 @@ import test from "node:test";
 
 import { createApp } from "../src/server.js";
 
-function startTestServer() {
+function startTestServer(options = {}) {
   const workspace = mkdtempSync(join(tmpdir(), "lucky-wheel-"));
   const app = createApp({
     databasePath: join(workspace, "test.db"),
     uploadDir: join(workspace, "uploads"),
     sessionSecret: "test-secret",
     adminUser: "admin",
-    adminPassword: "admin"
+    adminPassword: "admin",
+    mode: options.mode ?? "all"
   });
   const server = app.listen(0);
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
@@ -31,12 +32,45 @@ function startTestServer() {
       cookie = setCookie.split(";")[0];
     }
     const text = await response.text();
-    const body = text ? JSON.parse(text) : null;
+    let body = null;
+    try {
+      body = text ? JSON.parse(text) : null;
+    } catch {
+      body = text;
+    }
     return { status: response.status, body };
   }
 
   return { request, close: () => server.close() };
 }
+
+test("public mode does not expose admin login page or admin APIs", async (t) => {
+  const server = startTestServer({ mode: "public" });
+  t.after(server.close);
+
+  const adminPage = await server.request("/admin.html", {
+    headers: { accept: "text/html" }
+  });
+  assert.equal(adminPage.status, 404);
+
+  const adminApi = await server.request("/api/admin/me");
+  assert.equal(adminApi.status, 404);
+});
+
+test("admin mode serves the login page separately and hides public APIs", async (t) => {
+  const server = startTestServer({ mode: "admin" });
+  t.after(server.close);
+
+  const adminPage = await server.request("/", {
+    headers: { accept: "text/html" }
+  });
+  assert.equal(adminPage.status, 200);
+  assert.match(adminPage.body, /后台登录/);
+  assert.doesNotMatch(adminPage.body, /前台/);
+
+  const publicApi = await server.request("/api/public/campaigns/TEST2026");
+  assert.equal(publicApi.status, 404);
+});
 
 test("admin creates a campaign and public users can draw with IP logging", async (t) => {
   const server = startTestServer();

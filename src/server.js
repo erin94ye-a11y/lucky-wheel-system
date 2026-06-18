@@ -31,6 +31,10 @@ export function createApp(options = {}) {
   const uploadDir =
     options.uploadDir || process.env.UPLOAD_DIR || join(projectRoot, "uploads");
   const publicDir = options.publicDir || join(projectRoot, "public");
+  const adminDir = options.adminDir || join(projectRoot, "admin");
+  const mode = options.mode || process.env.APP_MODE || "public";
+  const publicEnabled = mode === "public" || mode === "all";
+  const adminEnabled = mode === "admin" || mode === "all";
   const adminUser = options.adminUser || process.env.ADMIN_USER || "admin";
   const adminPassword = options.adminPassword || process.env.ADMIN_PASSWORD || "admin";
   const sessionSecret =
@@ -62,104 +66,123 @@ export function createApp(options = {}) {
   app.set("trust proxy", true);
   app.use(express.json({ limit: "1mb" }));
   app.use("/uploads", express.static(uploadDir));
-  app.use(express.static(publicDir));
+  app.get("/styles.css", (_request, response) => {
+    response.sendFile(join(publicDir, "styles.css"));
+  });
+
+  if (publicEnabled) {
+    app.use(express.static(publicDir));
+  }
+
+  if (adminEnabled) {
+    if (!publicEnabled) {
+      app.get("/", (_request, response) => {
+        response.sendFile(join(adminDir, "admin.html"));
+      });
+    }
+    app.use(express.static(adminDir));
+  }
 
   app.get("/health", (_request, response) => {
     response.json({ ok: true });
   });
 
-  app.post("/api/admin/login", (request, response) => {
-    const { username, password } = request.body ?? {};
-    if (username !== adminUser || password !== adminPassword) {
-      response.status(401).json({ error: "账号或密码错误。" });
-      return;
-    }
+  if (adminEnabled) {
+    app.post("/api/admin/login", (request, response) => {
+      const { username, password } = request.body ?? {};
+      if (username !== adminUser || password !== adminPassword) {
+        response.status(401).json({ error: "账号或密码错误。" });
+        return;
+      }
 
-    response.cookie(COOKIE_NAME, createToken({ username }, sessionSecret), {
-      httpOnly: true,
-      sameSite: "lax",
-      maxAge: 1000 * 60 * 60 * 12
+      response.cookie(COOKIE_NAME, createToken({ username }, sessionSecret), {
+        httpOnly: true,
+        sameSite: "lax",
+        maxAge: 1000 * 60 * 60 * 12
+      });
+      response.json({ user: { username } });
     });
-    response.json({ user: { username } });
-  });
 
-  app.post("/api/admin/logout", requireAdmin(sessionSecret), (_request, response) => {
-    response.clearCookie(COOKIE_NAME);
-    response.json({ ok: true });
-  });
+    app.post("/api/admin/logout", requireAdmin(sessionSecret), (_request, response) => {
+      response.clearCookie(COOKIE_NAME);
+      response.json({ ok: true });
+    });
 
-  app.get("/api/admin/me", requireAdmin(sessionSecret), (request, response) => {
-    response.json({ user: request.admin });
-  });
+    app.get("/api/admin/me", requireAdmin(sessionSecret), (request, response) => {
+      response.json({ user: request.admin });
+    });
 
-  app.get("/api/admin/campaigns", requireAdmin(sessionSecret), (_request, response) => {
-    response.json({ campaigns: listCampaigns(db) });
-  });
+    app.get("/api/admin/campaigns", requireAdmin(sessionSecret), (_request, response) => {
+      response.json({ campaigns: listCampaigns(db) });
+    });
 
-  app.post("/api/admin/campaigns", requireAdmin(sessionSecret), (request, response, next) => {
-    try {
-      const campaign = createCampaign(db, request.body ?? {});
-      response.status(201).json({ campaign, prizes: campaign.prizes });
-    } catch (error) {
-      next(error);
-    }
-  });
+    app.post("/api/admin/campaigns", requireAdmin(sessionSecret), (request, response, next) => {
+      try {
+        const campaign = createCampaign(db, request.body ?? {});
+        response.status(201).json({ campaign, prizes: campaign.prizes });
+      } catch (error) {
+        next(error);
+      }
+    });
 
-  app.put("/api/admin/campaigns/:id", requireAdmin(sessionSecret), (request, response, next) => {
-    try {
-      const campaign = updateCampaign(db, Number(request.params.id), request.body ?? {});
-      response.json({ campaign, prizes: campaign.prizes });
-    } catch (error) {
-      next(error);
-    }
-  });
+    app.put("/api/admin/campaigns/:id", requireAdmin(sessionSecret), (request, response, next) => {
+      try {
+        const campaign = updateCampaign(db, Number(request.params.id), request.body ?? {});
+        response.json({ campaign, prizes: campaign.prizes });
+      } catch (error) {
+        next(error);
+      }
+    });
 
-  app.post(
-    "/api/admin/upload",
-    requireAdmin(sessionSecret),
-    upload.single("image"),
-    (request, response) => {
-      response.json({ image_url: `/uploads/${request.file.filename}` });
-    }
-  );
+    app.post(
+      "/api/admin/upload",
+      requireAdmin(sessionSecret),
+      upload.single("image"),
+      (request, response) => {
+        response.json({ image_url: `/uploads/${request.file.filename}` });
+      }
+    );
 
-  app.get("/api/admin/draws", requireAdmin(sessionSecret), (_request, response) => {
-    response.json({ draws: listDraws(db) });
-  });
+    app.get("/api/admin/draws", requireAdmin(sessionSecret), (_request, response) => {
+      response.json({ draws: listDraws(db) });
+    });
+  }
 
-  app.get("/api/public/campaigns/:code", (request, response, next) => {
-    try {
-      const campaign = publicCampaign(getCampaignByCode(db, request.params.code));
-      response.json({ campaign, prizes: campaign.prizes });
-    } catch (error) {
-      next(error);
-    }
-  });
+  if (publicEnabled) {
+    app.get("/api/public/campaigns/:code", (request, response, next) => {
+      try {
+        const campaign = publicCampaign(getCampaignByCode(db, request.params.code));
+        response.json({ campaign, prizes: campaign.prizes });
+      } catch (error) {
+        next(error);
+      }
+    });
 
-  app.post("/api/public/draw", (request, response, next) => {
-    try {
-      const result = performDraw(db, sanitizeCode(request.body?.code), {
-        ip: request.ip,
-        forwardedFor: request.get("x-forwarded-for") ?? "",
-        userAgent: request.get("user-agent") ?? ""
-      });
+    app.post("/api/public/draw", (request, response, next) => {
+      try {
+        const result = performDraw(db, sanitizeCode(request.body?.code), {
+          ip: request.ip,
+          forwardedFor: request.get("x-forwarded-for") ?? "",
+          userAgent: request.get("user-agent") ?? ""
+        });
 
-      response.json({
-        prize: {
-          id: result.prize.id,
-          name: result.prize.name,
-          image_url: result.prize.image_url
-        },
-        draw: {
-          id: result.draw.id,
-          created_at: result.draw.created_at
-        },
-        campaign: publicCampaign(result.campaign, { validate: false })
-      });
-    } catch (error) {
-      next(error);
-    }
-  });
+        response.json({
+          prize: {
+            id: result.prize.id,
+            name: result.prize.name,
+            image_url: result.prize.image_url
+          },
+          draw: {
+            id: result.draw.id,
+            created_at: result.draw.created_at
+          },
+          campaign: publicCampaign(result.campaign, { validate: false })
+        });
+      } catch (error) {
+        next(error);
+      }
+    });
+  }
 
   app.use((error, _request, response, _next) => {
     const statusCode = error.statusCode || (error.message?.includes("image") ? 400 : 500);
@@ -233,8 +256,9 @@ function readCookie(cookieHeader, name) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const port = Number(process.env.PORT || 3000);
-  createApp().listen(port, () => {
-    console.log(`Lucky wheel server is running on port ${port}`);
+  const mode = process.env.APP_MODE || "public";
+  const port = Number(process.env.PORT || (mode === "admin" ? 3001 : 3000));
+  createApp({ mode }).listen(port, () => {
+    console.log(`Lucky wheel ${mode} server is running on port ${port}`);
   });
 }

@@ -6,6 +6,9 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
+    "start:public": "node src/server.js",
+    "start:admin": "node src/admin-server.js",
+    "start:local": "node src/local.js",
     "test": "node --test"
   },
   "engines": {
