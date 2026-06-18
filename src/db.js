@@ -40,6 +40,17 @@ function migrate(db) {
       FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS global_prizes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      image_url TEXT,
+      probability REAL NOT NULL,
+      stock INTEGER,
+      won_count INTEGER NOT NULL DEFAULT 0,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS draws (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       campaign_id INTEGER NOT NULL,
@@ -78,7 +89,7 @@ export function getCampaignByCode(db, code) {
 
   return {
     ...serializeCampaign(campaign),
-    prizes: listPrizes(db, campaign.id)
+    prizes: listDrawablePrizesForCampaign(db, campaign.id)
   };
 }
 
@@ -105,6 +116,77 @@ export function updateCampaign(db, id, input) {
 
 export function generateCampaignCode(db) {
   return ensureUniqueCode(db, null);
+}
+
+export function listGlobalPrizes(db) {
+  return db
+    .prepare("SELECT * FROM global_prizes ORDER BY sort_order ASC, id ASC")
+    .all()
+    .map(serializeGlobalPrize);
+}
+
+export function replaceGlobalPrizes(db, input) {
+  const transaction = db.transaction(() => {
+    const prizes = normalizePrizeInput(input.prizes ?? []);
+    db.prepare("DELETE FROM global_prizes").run();
+
+    const insertPrize = db.prepare(`
+      INSERT INTO global_prizes (name, image_url, probability, stock, sort_order)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+
+    for (const prize of prizes) {
+      insertPrize.run(
+        prize.name,
+        prize.image_url,
+        prize.probability,
+        prize.stock,
+        prize.sort_order
+      );
+    }
+
+    return listGlobalPrizes(db);
+  });
+
+  return transaction();
+}
+
+export function bulkGenerateCampaignCodes(db, input) {
+  const transaction = db.transaction(() => {
+    const quantity = Number.parseInt(input.quantity ?? 1, 10);
+    const title = String(input.title ?? "Lucky Draw").trim() || "Lucky Draw";
+    const maxUses = Number.parseInt(input.max_uses ?? 1, 10);
+    const active = input.active === false || input.active === 0 || input.active === "0" ? 0 : 1;
+    const expiresAt = input.expires_at ? String(input.expires_at) : null;
+
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 500) {
+      const error = new Error("Quantity must be between 1 and 500.");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (!Number.isInteger(maxUses) || maxUses <= 0) {
+      const error = new Error("Max uses must be greater than 0.");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const insertCampaign = db.prepare(`
+      INSERT INTO campaigns (code, title, max_uses, active, expires_at)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    const created = [];
+
+    for (let index = 0; index < quantity; index += 1) {
+      const code = ensureUniqueCode(db, null);
+      const result = insertCampaign.run(code, title, maxUses, active, expiresAt);
+      created.push(getCampaignById(db, Number(result.lastInsertRowid)));
+    }
+
+    return created;
+  });
+
+  return transaction();
 }
 
 function saveCampaign(db, id, input) {
@@ -209,7 +291,11 @@ export function performDraw(db, code, requestMeta) {
       throw error;
     }
 
-    db.prepare("UPDATE prizes SET won_count = won_count + 1 WHERE id = ?").run(selectedPrize.id);
+    if (selectedPrize.pool === "global") {
+      db.prepare("UPDATE global_prizes SET won_count = won_count + 1 WHERE id = ?").run(selectedPrize.id);
+    } else {
+      db.prepare("UPDATE prizes SET won_count = won_count + 1 WHERE id = ?").run(selectedPrize.id);
+    }
     db.prepare(`
       UPDATE campaigns
       SET used_count = used_count + 1, updated_at = datetime('now')
@@ -232,7 +318,7 @@ export function performDraw(db, code, requestMeta) {
     return {
       draw: getDrawById(db, Number(result.lastInsertRowid)),
       prize: selectedPrize,
-      campaign: getCampaignById(db, campaign.id)
+      campaign: getCampaignByCode(db, campaign.code)
     };
   });
 
@@ -300,6 +386,15 @@ function listPrizes(db, campaignId) {
     .map(serializePrize);
 }
 
+function listDrawablePrizesForCampaign(db, campaignId) {
+  const globalPrizes = listGlobalPrizes(db);
+  if (globalPrizes.length > 0) {
+    return globalPrizes;
+  }
+
+  return listPrizes(db, campaignId);
+}
+
 export function publicCampaign(campaign, options = {}) {
   if (options.validate !== false) {
     validateDrawableCampaign(campaign);
@@ -339,6 +434,21 @@ function serializePrize(prize) {
   return {
     id: Number(prize.id),
     campaign_id: Number(prize.campaign_id),
+    pool: "campaign",
+    name: prize.name,
+    image_url: prize.image_url,
+    probability: Number(prize.probability),
+    stock: prize.stock === null ? null : Number(prize.stock),
+    won_count: Number(prize.won_count),
+    sort_order: Number(prize.sort_order)
+  };
+}
+
+function serializeGlobalPrize(prize) {
+  return {
+    id: Number(prize.id),
+    campaign_id: null,
+    pool: "global",
     name: prize.name,
     image_url: prize.image_url,
     probability: Number(prize.probability),

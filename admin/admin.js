@@ -4,26 +4,28 @@ const loginForm = document.querySelector("#loginForm");
 const loginMessage = document.querySelector("#loginMessage");
 const logoutButton = document.querySelector("#logoutButton");
 const refreshButton = document.querySelector("#refreshButton");
-const newCampaignButton = document.querySelector("#newCampaignButton");
 const campaignList = document.querySelector("#campaignList");
-const campaignForm = document.querySelector("#campaignForm");
-const editorTitle = document.querySelector("#editorTitle");
-const saveState = document.querySelector("#saveState");
-const campaignTitleInput = document.querySelector("#campaignTitleInput");
-const campaignCodeInput = document.querySelector("#campaignCodeInput");
-const generateCodeButton = document.querySelector("#generateCodeButton");
+const codeCount = document.querySelector("#codeCount");
+const codeGeneratorForm = document.querySelector("#codeGeneratorForm");
+const codeTitleInput = document.querySelector("#codeTitleInput");
+const quantityInput = document.querySelector("#quantityInput");
 const maxUsesInput = document.querySelector("#maxUsesInput");
 const expiresInput = document.querySelector("#expiresInput");
 const activeInput = document.querySelector("#activeInput");
+const codeState = document.querySelector("#codeState");
+const generatedCodes = document.querySelector("#generatedCodes");
+const generatedCount = document.querySelector("#generatedCount");
+const prizeForm = document.querySelector("#prizeForm");
+const prizeState = document.querySelector("#prizeState");
 const prizeRows = document.querySelector("#prizeRows");
 const prizeRowTemplate = document.querySelector("#prizeRowTemplate");
 const addPrizeButton = document.querySelector("#addPrizeButton");
-const resetFormButton = document.querySelector("#resetFormButton");
+const resetPrizeButton = document.querySelector("#resetPrizeButton");
 const drawLogRows = document.querySelector("#drawLogRows");
 const logCount = document.querySelector("#logCount");
 
 let campaigns = [];
-let selectedCampaignId = null;
+let prizesLoaded = false;
 
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -53,49 +55,57 @@ logoutButton.addEventListener("click", async () => {
 });
 
 refreshButton.addEventListener("click", refreshAll);
-newCampaignButton.addEventListener("click", resetForm);
-resetFormButton.addEventListener("click", resetForm);
+
+codeGeneratorForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  setState(codeState, "正在生成代码...", "muted");
+
+  const response = await api("/api/admin/codes/bulk", {
+    method: "POST",
+    body: {
+      title: codeTitleInput.value,
+      quantity: Number(quantityInput.value),
+      max_uses: Number(maxUsesInput.value),
+      expires_at: expiresInput.value ? new Date(expiresInput.value).toISOString() : null,
+      active: activeInput.checked
+    }
+  });
+
+  if (!response.ok) {
+    setState(codeState, response.error || "代码生成失败", "error");
+    return;
+  }
+
+  setState(codeState, `已生成 ${response.campaigns.length} 个代码`, "success");
+  renderGeneratedCodes(response.campaigns);
+  await refreshAll();
+});
+
+prizeForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  setState(prizeState, "正在保存奖品池...", "muted");
+
+  const response = await api("/api/admin/prizes", {
+    method: "PUT",
+    body: { prizes: readPrizeForm() }
+  });
+
+  if (!response.ok) {
+    setState(prizeState, response.error || "奖品池保存失败", "error");
+    return;
+  }
+
+  setState(prizeState, "奖品池已保存", "success");
+  renderPrizeSettings(response.prizes);
+});
 
 addPrizeButton.addEventListener("click", () => {
   addPrizeRow({ name: "", probability: 10, stock: "", image_url: "" });
 });
 
-generateCodeButton.addEventListener("click", async () => {
-  saveState.textContent = "正在生成代码...";
-  saveState.style.color = "#667085";
-  const response = await api("/api/admin/codes/generate");
-  if (response.ok) {
-    campaignCodeInput.value = response.code;
-    saveState.textContent = "代码已生成";
-    saveState.style.color = "#078f8a";
-  } else {
-    saveState.textContent = response.error || "代码生成失败";
-    saveState.style.color = "#bd2440";
-  }
-});
-
-campaignForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  saveState.textContent = "保存中...";
-
-  const payload = readCampaignForm();
-  const url = selectedCampaignId
-    ? `/api/admin/campaigns/${selectedCampaignId}`
-    : "/api/admin/campaigns";
-  const method = selectedCampaignId ? "PUT" : "POST";
-  const response = await api(url, { method, body: payload });
-
-  if (!response.ok) {
-    saveState.textContent = response.error;
-    saveState.style.color = "#bd2440";
-    return;
-  }
-
-  saveState.textContent = "已保存";
-  saveState.style.color = "#078f8a";
-  selectedCampaignId = response.campaign.id;
-  await refreshAll();
-  selectCampaign(selectedCampaignId);
+resetPrizeButton.addEventListener("click", () => {
+  renderPrizeSettings(defaultPrizes());
+  setState(prizeState, "已恢复默认示例，保存后生效", "muted");
 });
 
 async function boot() {
@@ -112,17 +122,20 @@ function showAdmin() {
 }
 
 async function refreshAll() {
-  const [campaignResponse, drawResponse] = await Promise.all([
+  const [campaignResponse, prizeResponse, drawResponse] = await Promise.all([
     api("/api/admin/campaigns"),
+    api("/api/admin/prizes"),
     api("/api/admin/draws")
   ]);
 
   if (campaignResponse.ok) {
     campaigns = campaignResponse.campaigns;
     renderCampaignList();
-    if (!selectedCampaignId && campaigns[0]) {
-      selectCampaign(campaigns[0].id);
-    }
+  }
+
+  if (prizeResponse.ok && !prizesLoaded) {
+    prizesLoaded = true;
+    renderPrizeSettings(prizeResponse.prizes.length ? prizeResponse.prizes : defaultPrizes());
   }
 
   if (drawResponse.ok) {
@@ -131,60 +144,45 @@ async function refreshAll() {
 }
 
 function renderCampaignList() {
+  codeCount.textContent = `${campaigns.length} 个`;
   campaignList.innerHTML = "";
   if (!campaigns.length) {
-    campaignList.innerHTML = `<p class="privacy-note">还没有抽奖代码。</p>`;
+    campaignList.innerHTML = `<p class="privacy-note">还没有生成抽奖代码。</p>`;
     return;
   }
 
   for (const campaign of campaigns) {
-    const item = document.createElement("button");
-    item.type = "button";
-    item.className = `campaign-item ${campaign.id === selectedCampaignId ? "active" : ""}`;
+    const item = document.createElement("div");
+    item.className = "campaign-item";
     item.innerHTML = `
-      <strong>${escapeHtml(campaign.title)}</strong>
-      <span>代码 ${escapeHtml(campaign.code)} · ${campaign.used_count}/${campaign.max_uses} 次</span>
+      <strong>${escapeHtml(campaign.code)}</strong>
+      <span>${escapeHtml(campaign.title)} · ${campaign.used_count}/${campaign.max_uses} 次</span>
       <span>${campaign.active ? "已启用" : "已停用"}</span>
     `;
-    item.addEventListener("click", () => selectCampaign(campaign.id));
     campaignList.append(item);
   }
 }
 
-function selectCampaign(id) {
-  const campaign = campaigns.find((item) => item.id === id);
-  if (!campaign) {
-    return;
-  }
+function renderGeneratedCodes(codes) {
+  generatedCount.textContent = `${codes.length} 个`;
+  generatedCodes.innerHTML = "";
 
-  selectedCampaignId = id;
-  editorTitle.textContent = "编辑抽奖活动";
-  saveState.textContent = "";
-  campaignTitleInput.value = campaign.title;
-  campaignCodeInput.value = campaign.code;
-  maxUsesInput.value = campaign.max_uses;
-  expiresInput.value = campaign.expires_at ? toDateTimeLocal(campaign.expires_at) : "";
-  activeInput.checked = campaign.active;
-  prizeRows.innerHTML = "";
-  for (const prize of campaign.prizes) {
-    addPrizeRow(prize);
+  for (const campaign of codes) {
+    const item = document.createElement("div");
+    item.className = "generated-code-item";
+    item.innerHTML = `
+      <strong>${escapeHtml(campaign.code)}</strong>
+      <span>${escapeHtml(campaign.title)}</span>
+    `;
+    generatedCodes.append(item);
   }
-  renderCampaignList();
 }
 
-function resetForm() {
-  selectedCampaignId = null;
-  editorTitle.textContent = "新建抽奖活动";
-  saveState.textContent = "";
-  campaignTitleInput.value = "";
-  campaignCodeInput.value = "";
-  maxUsesInput.value = "1";
-  expiresInput.value = "";
-  activeInput.checked = true;
+function renderPrizeSettings(prizes) {
   prizeRows.innerHTML = "";
-  addPrizeRow({ name: "一等奖", probability: 10, stock: 1, image_url: "" });
-  addPrizeRow({ name: "谢谢参与", probability: 90, stock: "", image_url: "" });
-  renderCampaignList();
+  for (const prize of prizes) {
+    addPrizeRow(prize);
+  }
 }
 
 function addPrizeRow(prize) {
@@ -212,32 +210,23 @@ function addPrizeRow(prize) {
     const data = await response.json();
     if (response.ok) {
       row.querySelector(".prize-image").value = data.image_url;
-      saveState.textContent = "图片已上传";
-      saveState.style.color = "#078f8a";
+      setState(prizeState, "图片已上传", "success");
     } else {
-      saveState.textContent = data.error || "图片上传失败";
-      saveState.style.color = "#bd2440";
+      setState(prizeState, data.error || "图片上传失败", "error");
     }
   });
 
   prizeRows.append(row);
 }
 
-function readCampaignForm() {
-  return {
-    title: campaignTitleInput.value,
-    code: campaignCodeInput.value,
-    max_uses: Number(maxUsesInput.value),
-    expires_at: expiresInput.value ? new Date(expiresInput.value).toISOString() : null,
-    active: activeInput.checked,
-    prizes: [...prizeRows.querySelectorAll(".prize-row")].map((row, index) => ({
-      name: row.querySelector(".prize-name").value,
-      probability: Number(row.querySelector(".prize-probability").value),
-      stock: row.querySelector(".prize-stock").value,
-      image_url: row.querySelector(".prize-image").value,
-      sort_order: index
-    }))
-  };
+function readPrizeForm() {
+  return [...prizeRows.querySelectorAll(".prize-row")].map((row, index) => ({
+    name: row.querySelector(".prize-name").value,
+    probability: Number(row.querySelector(".prize-probability").value),
+    stock: row.querySelector(".prize-stock").value,
+    image_url: row.querySelector(".prize-image").value,
+    sort_order: index
+  }));
 }
 
 function renderDraws(draws) {
@@ -279,13 +268,18 @@ function setLoginMessage(text, type) {
   loginMessage.className = `form-message ${type || ""}`.trim();
 }
 
-function toDateTimeLocal(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-  const offset = date.getTimezoneOffset() * 60000;
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+function setState(element, text, type) {
+  element.textContent = text;
+  element.style.color =
+    type === "error" ? "#bd2440" : type === "success" ? "#078f8a" : "#667085";
+}
+
+function defaultPrizes() {
+  return [
+    { name: "Grand Prize", probability: 10, stock: 1, image_url: "" },
+    { name: "Gift Card", probability: 30, stock: 10, image_url: "" },
+    { name: "Try Again", probability: 60, stock: "", image_url: "" }
+  ];
 }
 
 function formatTime(value) {
@@ -301,5 +295,4 @@ function escapeHtml(value) {
     .replace(/'/g, "&#039;");
 }
 
-resetForm();
 boot();

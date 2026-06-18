@@ -101,6 +101,61 @@ test("admin can generate an unused lottery code", async (t) => {
   assert.notEqual(generated.body.code, "ABCDEFGH");
 });
 
+test("admin manages one global prize pool and bulk-generates reusable codes", async (t) => {
+  const server = startTestServer({ mode: "all" });
+  t.after(server.close);
+
+  await server.request("/api/admin/login", {
+    method: "POST",
+    body: JSON.stringify({ username: "admin", password: "admin" })
+  });
+
+  const savedPrizes = await server.request("/api/admin/prizes", {
+    method: "PUT",
+    body: JSON.stringify({
+      prizes: [
+        { name: "Grand Prize", probability: 25, stock: 2, image_url: "" },
+        { name: "Gift Card", probability: 75, stock: null, image_url: "" }
+      ]
+    })
+  });
+  assert.equal(savedPrizes.status, 200);
+  assert.equal(savedPrizes.body.prizes.length, 2);
+
+  const generated = await server.request("/api/admin/codes/bulk", {
+    method: "POST",
+    body: JSON.stringify({
+      title: "Launch Giveaway",
+      quantity: 3,
+      max_uses: 1,
+      active: true
+    })
+  });
+  assert.equal(generated.status, 201);
+  assert.equal(generated.body.campaigns.length, 3);
+  assert.equal(new Set(generated.body.campaigns.map((campaign) => campaign.code)).size, 3);
+
+  const code = generated.body.campaigns[0].code;
+  const publicView = await server.request(`/api/public/campaigns/${code}`);
+  assert.equal(publicView.status, 200);
+  assert.deepEqual(
+    publicView.body.prizes.map((prize) => prize.name),
+    ["Grand Prize", "Gift Card"]
+  );
+
+  const prizePreview = await server.request("/api/public/prizes");
+  assert.equal(prizePreview.status, 200);
+  assert.equal(prizePreview.body.prizes.length, 2);
+  assert.equal(prizePreview.body.prizes[0].probability, undefined);
+
+  const draw = await server.request("/api/public/draw", {
+    method: "POST",
+    body: JSON.stringify({ code })
+  });
+  assert.equal(draw.status, 200);
+  assert.match(draw.body.prize.name, /Grand Prize|Gift Card/);
+});
+
 test("admin creates a campaign and public users can draw with IP logging", async (t) => {
   const server = startTestServer();
   t.after(server.close);

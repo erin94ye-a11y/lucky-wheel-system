@@ -7,14 +7,17 @@ import express from "express";
 import multer from "multer";
 
 import {
+  bulkGenerateCampaignCodes,
   createCampaign,
   generateCampaignCode,
   getCampaignByCode,
+  listGlobalPrizes,
   listCampaigns,
   listDraws,
   openDatabase,
   performDraw,
   publicCampaign,
+  replaceGlobalPrizes,
   updateCampaign
 } from "./db.js";
 import { sanitizeCode } from "./lottery.js";
@@ -121,6 +124,27 @@ export function createApp(options = {}) {
       response.json({ code: generateCampaignCode(db) });
     });
 
+    app.post("/api/admin/codes/bulk", requireAdmin(sessionSecret), (request, response, next) => {
+      try {
+        const campaigns = bulkGenerateCampaignCodes(db, request.body ?? {});
+        response.status(201).json({ campaigns });
+      } catch (error) {
+        next(error);
+      }
+    });
+
+    app.get("/api/admin/prizes", requireAdmin(sessionSecret), (_request, response) => {
+      response.json({ prizes: listGlobalPrizes(db) });
+    });
+
+    app.put("/api/admin/prizes", requireAdmin(sessionSecret), (request, response, next) => {
+      try {
+        response.json({ prizes: replaceGlobalPrizes(db, request.body ?? {}) });
+      } catch (error) {
+        next(error);
+      }
+    });
+
     app.post("/api/admin/campaigns", requireAdmin(sessionSecret), (request, response, next) => {
       try {
         const campaign = createCampaign(db, request.body ?? {});
@@ -154,6 +178,10 @@ export function createApp(options = {}) {
   }
 
   if (publicEnabled) {
+    app.get("/api/public/prizes", (_request, response) => {
+      response.json({ prizes: toPublicPrizes(listGlobalPrizes(db)) });
+    });
+
     app.get("/api/public/campaigns/:code", (request, response, next) => {
       try {
         const campaign = publicCampaign(getCampaignByCode(db, request.params.code));
@@ -197,6 +225,15 @@ export function createApp(options = {}) {
   });
 
   return app;
+}
+
+function toPublicPrizes(prizes) {
+  return prizes.map((prize) => ({
+    id: prize.id,
+    name: prize.name,
+    image_url: prize.image_url,
+    available: prize.stock === null ? null : Math.max(0, prize.stock - prize.won_count)
+  }));
 }
 
 function requireAdmin(secret) {

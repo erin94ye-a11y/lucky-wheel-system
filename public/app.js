@@ -22,7 +22,7 @@ let isSpinning = false;
 
 codeForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  setMessage("正在校验抽奖代码...", "");
+  setMessage("Checking your code...", "");
   resultPanel.classList.add("is-hidden");
 
   try {
@@ -35,19 +35,11 @@ codeForm.addEventListener("submit", async (event) => {
 
     activeCampaign = data.campaign;
     renderCampaign(activeCampaign);
-    setMessage("代码有效，可以开始抽奖。", "success");
+    setMessage("Code verified. Your spin is ready.", "success");
   } catch (error) {
-    wheelStage.classList.add("is-hidden");
-    welcomeStage.classList.remove("is-hidden");
     setMessage(error.message, "error");
   }
 });
-
-const initialCode = new URLSearchParams(window.location.search).get("code");
-if (initialCode) {
-  codeInput.value = initialCode.trim().toUpperCase();
-  codeForm.requestSubmit();
-}
 
 spinButton.addEventListener("click", async () => {
   if (!activeCampaign || isSpinning) {
@@ -57,7 +49,7 @@ spinButton.addEventListener("click", async () => {
   isSpinning = true;
   spinButton.disabled = true;
   resultPanel.classList.add("is-hidden");
-  setMessage("抽奖中...", "");
+  setMessage("Spinning...", "");
 
   try {
     const response = await fetch("/api/public/draw", {
@@ -67,7 +59,7 @@ spinButton.addEventListener("click", async () => {
     });
     const data = await response.json();
     if (!response.ok) {
-      throw new Error(data.error || "抽奖失败。");
+      throw new Error(data.error || "Unable to complete the draw.");
     }
 
     spinToPrize(data.prize, data.campaign);
@@ -78,6 +70,43 @@ spinButton.addEventListener("click", async () => {
   }
 });
 
+async function bootPublicPage() {
+  await loadPrizePool();
+  const initialCode = new URLSearchParams(window.location.search).get("code");
+  if (initialCode) {
+    codeInput.value = initialCode.trim().toUpperCase();
+    codeForm.requestSubmit();
+  }
+}
+
+async function loadPrizePool() {
+  try {
+    const response = await fetch("/api/public/prizes");
+    const data = await response.json();
+    if (!response.ok || !data.prizes?.length) {
+      renderStaticPrizePool(defaultPrizePool());
+      return;
+    }
+
+    renderStaticPrizePool(data.prizes);
+  } catch {
+    renderStaticPrizePool(defaultPrizePool());
+  }
+}
+
+function renderStaticPrizePool(prizes) {
+  activeCampaign = null;
+  campaignCode.textContent = "Live prize pool";
+  campaignTitle.textContent = "Prize Lineup";
+  campaignMeta.textContent = "Enter your code to unlock one spin.";
+  welcomeStage.classList.add("is-hidden");
+  wheelStage.classList.remove("is-hidden");
+  spinButton.disabled = true;
+  spinButton.textContent = "Enter Code";
+  renderWheel(prizes);
+  renderPrizePreview(prizes);
+}
+
 function renderCampaign(campaign) {
   activeCampaign = campaign;
   const remaining = Math.max(0, campaign.max_uses - campaign.used_count);
@@ -87,11 +116,15 @@ function renderCampaign(campaign) {
   welcomeStage.classList.add("is-hidden");
   wheelStage.classList.remove("is-hidden");
   spinButton.disabled = remaining <= 0;
-  spinButton.textContent = remaining <= 0 ? "次数已用完" : "开始抽奖";
+  spinButton.textContent = remaining <= 0 ? "Used" : "Spin Now";
   isSpinning = false;
 
   const prizes = campaign.prizes.length ? campaign.prizes : [{ name: "暂无奖品" }];
+  renderWheel(prizes);
   renderPrizePreview(prizes);
+}
+
+function renderWheel(prizes) {
   const slice = 360 / prizes.length;
   const gradient = prizes
     .map((_, index) => {
@@ -183,7 +216,7 @@ function spinToPrize(prize, updatedCampaign) {
     resultPanel.classList.remove("is-hidden");
     renderCampaign(updatedCampaign);
     wheel.style.transform = `rotate(${currentRotation}deg)`;
-    setMessage("抽奖完成。", "success");
+    setMessage("Spin complete.", "success");
   }, 4200);
 }
 
@@ -191,3 +224,13 @@ function setMessage(text, type) {
   message.textContent = text;
   message.className = `form-message ${type || ""}`.trim();
 }
+
+function defaultPrizePool() {
+  return [
+    { name: "Grand Prize", image_url: "", available: null },
+    { name: "Gift Card", image_url: "", available: null },
+    { name: "Try Again", image_url: "", available: null }
+  ];
+}
+
+bootPublicPage();

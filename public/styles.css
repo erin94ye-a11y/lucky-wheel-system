@@ -684,7 +684,7 @@ button.danger:hover {
 .admin-grid {
   display: grid;
   gap: 18px;
-  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
   padding: 0 clamp(18px, 4vw, 40px) 40px;
 }
 
@@ -709,6 +709,8 @@ button.danger:hover {
 .campaign-list {
   display: grid;
   gap: 10px;
+  max-height: 460px;
+  overflow: auto;
 }
 
 .campaign-item {
@@ -716,7 +718,6 @@ button.danger:hover {
   border: 1px solid var(--line);
   border-radius: 8px;
   color: var(--ink);
-  cursor: pointer;
   display: grid;
   gap: 6px;
   justify-items: start;
@@ -730,6 +731,67 @@ button.danger:hover {
 .campaign-item.active {
   border-color: var(--teal);
   box-shadow: 0 0 0 3px rgba(7, 143, 138, 0.12);
+}
+
+.code-generator-panel,
+.prize-settings-panel {
+  align-self: start;
+}
+
+.code-generator-panel .form-grid {
+  grid-template-columns: 1fr;
+}
+
+.code-generator-panel .panel-title span,
+.generated-code-panel .panel-title span {
+  white-space: nowrap;
+}
+
+.generated-code-panel {
+  border-top: 1px solid var(--line);
+  margin-top: 18px;
+  padding-top: 16px;
+}
+
+.compact-title {
+  margin-bottom: 10px;
+}
+
+.compact-title h3 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.generated-codes {
+  display: grid;
+  gap: 8px;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.generated-code-item {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 10px 12px;
+}
+
+.generated-code-item strong {
+  color: var(--navy);
+  font-size: 15px;
+  letter-spacing: 0;
+}
+
+.generated-code-item span {
+  color: var(--muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .campaign-item strong {

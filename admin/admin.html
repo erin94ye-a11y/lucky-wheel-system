@@ -37,35 +37,23 @@
       </header>
 
       <div class="admin-grid">
-        <aside class="panel campaign-list-panel">
+        <section class="panel code-generator-panel">
           <div class="panel-title">
-            <h2>抽奖代码</h2>
-            <button class="secondary" id="newCampaignButton" type="button">新建</button>
+            <h2>批量生成抽奖代码</h2>
+            <span id="codeState"></span>
           </div>
-          <div class="campaign-list" id="campaignList"></div>
-        </aside>
-
-        <section class="panel editor-panel">
-          <div class="panel-title">
-            <h2 id="editorTitle">新建抽奖活动</h2>
-            <span id="saveState"></span>
-          </div>
-
-          <form id="campaignForm" class="campaign-form">
+          <form id="codeGeneratorForm" class="campaign-form">
             <div class="form-grid">
               <label>
-                活动名称
-                <input id="campaignTitleInput" required placeholder="例如 周年庆抽奖" />
+                批次名称
+                <input id="codeTitleInput" required placeholder="例如 July Giveaway" />
               </label>
               <label>
-                抽奖代码
-                <span class="code-generate-field">
-                  <input id="campaignCodeInput" placeholder="留空保存时自动生成" />
-                  <button class="secondary" id="generateCodeButton" type="button">生成代码</button>
-                </span>
+                生成数量
+                <input id="quantityInput" type="number" min="1" max="500" value="20" required />
               </label>
               <label>
-                可抽次数
+                每个代码可抽次数
                 <input id="maxUsesInput" type="number" min="1" value="1" required />
               </label>
               <label>
@@ -73,24 +61,48 @@
                 <input id="expiresInput" type="datetime-local" />
               </label>
             </div>
-
             <label class="switch-row">
               <input id="activeInput" type="checkbox" checked />
-              <span>启用这个抽奖代码</span>
+              <span>生成后立即启用</span>
             </label>
+            <div class="submit-row">
+              <button type="submit">生成代码</button>
+            </div>
+          </form>
+          <div class="generated-code-panel">
+            <div class="panel-title compact-title">
+              <h3>最近生成</h3>
+              <span id="generatedCount"></span>
+            </div>
+            <div class="generated-codes" id="generatedCodes"></div>
+          </div>
+        </section>
 
+        <section class="panel editor-panel prize-settings-panel">
+          <div class="panel-title">
+            <h2>统一奖品池设置</h2>
+            <span id="prizeState"></span>
+          </div>
+          <form id="prizeForm" class="campaign-form">
             <div class="prize-toolbar">
-              <h3>奖品与概率</h3>
+              <h3>奖品、图片、概率与库存</h3>
               <button class="secondary" id="addPrizeButton" type="button">添加奖品</button>
             </div>
             <div class="prize-table" id="prizeRows"></div>
-
             <div class="submit-row">
-              <button type="submit">保存活动</button>
-              <button class="secondary" id="resetFormButton" type="button">清空</button>
+              <button type="submit">保存奖品池</button>
+              <button class="secondary" id="resetPrizeButton" type="button">恢复默认示例</button>
             </div>
           </form>
         </section>
+
+        <aside class="panel campaign-list-panel">
+          <div class="panel-title">
+            <h2>已生成代码</h2>
+            <span id="codeCount"></span>
+          </div>
+          <div class="campaign-list" id="campaignList"></div>
+        </aside>
 
         <section class="panel logs-panel">
           <div class="panel-title">
