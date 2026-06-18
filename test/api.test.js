@@ -66,11 +66,14 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
   });
   assert.equal(page.status, 200);
   assert.doesNotMatch(page.body, /参与抽奖会记录服务器可见 IP/);
+  assert.doesNotMatch(page.body, /[\u3400-\u9fff]/);
+  assert.doesNotMatch(page.body, /topbar-cta/);
 
   const script = await server.request("/app.js", {
     headers: { accept: "text/javascript" }
   });
   assert.equal(script.status, 200);
+  assert.doesNotMatch(script.body, /[\u3400-\u9fff]/);
   const fallbackPrizeNames = [
     "Grand Prize",
     "$100 Gift Card",
@@ -98,7 +101,8 @@ test("public page keeps the code entry flow and removes the unused reward intro"
   });
   assert.equal(page.status, 200);
   assert.match(page.body, /CryptoReward/);
-  assert.match(page.body, /输入抽奖代码/);
+  assert.match(page.body, /Enter your code/);
+  assert.match(page.body, /Prize Wheel/);
   assert.doesNotMatch(page.body, /reward-kicker/);
   assert.doesNotMatch(page.body, /stats-strip/);
   assert.doesNotMatch(page.body, /ticket-preview/);
@@ -116,6 +120,27 @@ test("public page keeps the code entry flow and removes the unused reward intro"
   assert.doesNotMatch(script.body, /winner-code/);
   assert.doesNotMatch(script.body, /winner-prize/);
   assert.doesNotMatch(script.body, /winner-time/);
+  assert.doesNotMatch(script.body, /campaignTitle\.textContent = campaign\.title/);
+});
+
+test("admin bulk code UI omits batch title and includes code deletion", async (t) => {
+  const server = startTestServer({ mode: "admin" });
+  t.after(server.close);
+
+  const adminPage = await server.request("/", {
+    headers: { accept: "text/html" }
+  });
+  assert.equal(adminPage.status, 200);
+  assert.doesNotMatch(adminPage.body, /批次名称/);
+  assert.doesNotMatch(adminPage.body, /codeTitleInput/);
+
+  const adminScript = await server.request("/admin.js", {
+    headers: { accept: "text/javascript" }
+  });
+  assert.equal(adminScript.status, 200);
+  assert.doesNotMatch(adminScript.body, /codeTitleInput/);
+  assert.match(adminScript.body, /deleteCampaign/);
+  assert.match(adminScript.body, /method: "DELETE"/);
 });
 
 test("admin mode serves the login page separately and hides public APIs", async (t) => {
@@ -186,7 +211,6 @@ test("admin manages one global prize pool and bulk-generates reusable codes", as
   const generated = await server.request("/api/admin/codes/bulk", {
     method: "POST",
     body: JSON.stringify({
-      title: "Launch Giveaway",
       quantity: 3,
       max_uses: 1,
       active: true
@@ -199,6 +223,7 @@ test("admin manages one global prize pool and bulk-generates reusable codes", as
   const code = generated.body.campaigns[0].code;
   const publicView = await server.request(`/api/public/campaigns/${code}`);
   assert.equal(publicView.status, 200);
+  assert.equal(publicView.body.campaign.title, undefined);
   assert.deepEqual(
     publicView.body.prizes.map((prize) => prize.name),
     ["Grand Prize", "Gift Card"]
@@ -249,7 +274,7 @@ test("admin creates a campaign and public users can draw with IP logging", async
 
   const publicView = await server.request("/api/public/campaigns/TEST2026");
   assert.equal(publicView.status, 200);
-  assert.equal(publicView.body.campaign.title, "Summer Draw");
+  assert.equal(publicView.body.campaign.title, undefined);
   assert.equal(publicView.body.prizes[0].name, "Phone");
   assert.equal(publicView.body.prizes[0].probability, undefined);
 
@@ -269,6 +294,40 @@ test("admin creates a campaign and public users can draw with IP logging", async
   assert.equal(logs.body.draws[0].code, "TEST2026");
   assert.equal(logs.body.draws[0].prize_name, "Phone");
   assert.equal(logs.body.draws[0].forwarded_for, "203.0.113.10");
+});
+
+test("admin can delete a generated lottery code", async (t) => {
+  const server = startTestServer();
+  t.after(server.close);
+
+  await server.request("/api/admin/login", {
+    method: "POST",
+    body: JSON.stringify({ username: "admin", password: "admin" })
+  });
+
+  const generated = await server.request("/api/admin/codes/bulk", {
+    method: "POST",
+    body: JSON.stringify({
+      quantity: 1,
+      max_uses: 1,
+      active: true
+    })
+  });
+  assert.equal(generated.status, 201);
+  const campaign = generated.body.campaigns[0];
+
+  const deleted = await server.request(`/api/admin/campaigns/${campaign.id}`, {
+    method: "DELETE"
+  });
+  assert.equal(deleted.status, 200);
+  assert.equal(deleted.body.deleted.id, campaign.id);
+
+  const campaigns = await server.request("/api/admin/campaigns");
+  assert.equal(campaigns.status, 200);
+  assert.equal(campaigns.body.campaigns.some((item) => item.id === campaign.id), false);
+
+  const publicView = await server.request(`/api/public/campaigns/${campaign.code}`);
+  assert.equal(publicView.status, 404);
 });
 
 test("a one-use campaign still returns the winning draw response", async (t) => {
@@ -331,5 +390,5 @@ test("draw returns a friendly error when prize stock is exhausted", async (t) =>
     body: JSON.stringify({ code: "STOCK2026" })
   });
   assert.equal(second.status, 400);
-  assert.match(second.body.error, /奖品库存/);
+  assert.match(second.body.error, /inventory/i);
 });

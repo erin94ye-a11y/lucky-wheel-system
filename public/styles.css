@@ -504,12 +504,12 @@ button.danger:hover {
   color: #fff;
   display: flex;
   flex-direction: column;
-  font-size: 13px;
+  font-size: 17px;
   font-weight: 900;
   gap: 6px;
   left: 50%;
   line-height: 1.2;
-  max-width: 92px;
+  max-width: 124px;
   position: absolute;
   text-align: center;
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.36);
@@ -527,14 +527,14 @@ button.danger:hover {
 }
 
 .wheel.is-dense .wheel-label {
-  font-size: 11px;
+  font-size: 15px;
   gap: 4px;
-  max-width: 76px;
+  max-width: 110px;
 }
 
 .wheel.is-crowded .wheel-label {
-  font-size: 10px;
-  max-width: 64px;
+  font-size: 14px;
+  max-width: 104px;
 }
 
 .wheel.is-crowded .wheel-label img {
@@ -614,6 +614,7 @@ body.public-page {
 .public-page .topbar {
   background: rgba(5, 11, 22, 0.86);
   border-bottom: 1px solid rgba(86, 112, 151, 0.24);
+  justify-content: flex-start;
   left: 0;
   padding: 22px clamp(18px, 5vw, 44px);
   position: sticky;
@@ -878,13 +879,14 @@ body.public-page {
 }
 
 .campaign-item {
+  align-items: center;
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 8px;
   color: var(--ink);
   display: grid;
   gap: 6px;
-  justify-items: start;
+  grid-template-columns: minmax(0, 1fr) auto;
   min-height: 0;
   padding: 12px;
   text-align: left;
@@ -938,18 +940,29 @@ body.public-page {
   background: #f8fafc;
   border: 1px solid var(--line);
   border-radius: 8px;
-  display: flex;
+  display: grid;
   gap: 10px;
-  justify-content: space-between;
+  grid-template-columns: minmax(0, 1fr) auto;
   padding: 10px 12px;
 }
 
+.campaign-item-body {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.campaign-item-body strong,
 .generated-code-item strong {
   color: var(--navy);
   font-size: 15px;
   letter-spacing: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
+.campaign-item-body span,
 .generated-code-item span {
   color: var(--muted);
   font-size: 12px;
@@ -958,13 +971,19 @@ body.public-page {
   white-space: nowrap;
 }
 
-.campaign-item strong {
-  font-size: 15px;
+.code-delete-button {
+  background: #fff;
+  border: 1px solid rgba(226, 61, 87, 0.42);
+  border-radius: 8px;
+  color: var(--accent-strong);
+  font-size: 13px;
+  min-height: 34px;
+  padding: 0 12px;
 }
 
-.campaign-item span {
-  color: var(--muted);
-  font-size: 12px;
+.code-delete-button:hover {
+  background: rgba(226, 61, 87, 0.08);
+  color: var(--accent-strong);
 }
 
 .editor-panel {
@@ -1253,8 +1272,8 @@ td {
   }
 
   .wheel-label {
-    font-size: 10px;
-    max-width: 60px;
+    font-size: 13px;
+    max-width: 88px;
   }
 
   .wheel-label img {

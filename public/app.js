@@ -5,9 +5,7 @@ const welcomeStage = document.querySelector("#welcomeStage");
 const wheelStage = document.querySelector("#wheelStage");
 const wheel = document.querySelector("#wheel");
 const spinButton = document.querySelector("#spinButton");
-const campaignCode = document.querySelector("#campaignCode");
 const campaignTitle = document.querySelector("#campaignTitle");
-const campaignMeta = document.querySelector("#campaignMeta");
 const resultPanel = document.querySelector("#resultPanel");
 const resultImage = document.querySelector("#resultImage");
 const resultName = document.querySelector("#resultName");
@@ -30,7 +28,7 @@ let isSpinning = false;
 
 codeForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  setMessage("正在验证抽奖代码...", "");
+  setMessage("Checking your code...", "");
   resultPanel.classList.add("is-hidden");
 
   try {
@@ -38,12 +36,12 @@ codeForm.addEventListener("submit", async (event) => {
     const response = await fetch(`/api/public/campaigns/${encodeURIComponent(code)}`);
     const data = await response.json();
     if (!response.ok) {
-      throw new Error(data.error || "抽奖代码不可用。");
+      throw new Error(data.error || "This code is not available.");
     }
 
     activeCampaign = data.campaign;
     renderCampaign(activeCampaign);
-    setMessage("代码已验证，可以立即抽奖。", "success");
+    setMessage("Code verified. Your spin is ready.", "success");
   } catch (error) {
     setMessage(error.message, "error");
   }
@@ -57,7 +55,7 @@ spinButton.addEventListener("click", async () => {
   isSpinning = true;
   spinButton.disabled = true;
   resultPanel.classList.add("is-hidden");
-  setMessage("抽奖中...", "");
+  setMessage("Spinning...", "");
 
   try {
     const response = await fetch("/api/public/draw", {
@@ -67,7 +65,7 @@ spinButton.addEventListener("click", async () => {
     });
     const data = await response.json();
     if (!response.ok) {
-      throw new Error(data.error || "抽奖失败，请稍后再试。");
+      throw new Error(data.error || "Unable to complete the draw. Please try again.");
     }
 
     spinToPrize(data.prize, data.campaign);
@@ -104,29 +102,25 @@ async function loadPrizePool() {
 
 function renderStaticPrizePool(prizes) {
   activeCampaign = null;
-  campaignCode.textContent = "签到奖励";
-  campaignTitle.textContent = "抽奖转盘";
-  campaignMeta.textContent = "输入代码后即可解锁一次机会。";
+  campaignTitle.textContent = "Prize Wheel";
   welcomeStage.classList.add("is-hidden");
   wheelStage.classList.remove("is-hidden");
   spinButton.disabled = true;
-  spinButton.textContent = "输入代码";
+  spinButton.textContent = "Enter Code";
   renderWheel(prizes);
 }
 
 function renderCampaign(campaign) {
   activeCampaign = campaign;
   const remaining = Math.max(0, campaign.max_uses - campaign.used_count);
-  campaignCode.textContent = `抽奖代码 ${campaign.code}`;
-  campaignTitle.textContent = campaign.title;
-  campaignMeta.textContent = `剩余次数 ${remaining} / ${campaign.max_uses}`;
+  campaignTitle.textContent = "Prize Wheel";
   welcomeStage.classList.add("is-hidden");
   wheelStage.classList.remove("is-hidden");
   spinButton.disabled = remaining <= 0;
-  spinButton.textContent = remaining <= 0 ? "已使用" : "立即抽奖";
+  spinButton.textContent = remaining <= 0 ? "Used" : "Spin Now";
   isSpinning = false;
 
-  const prizes = campaign.prizes.length ? campaign.prizes : [{ name: "暂无奖品" }];
+  const prizes = campaign.prizes.length ? campaign.prizes : [{ name: "No prizes yet" }];
   renderWheel(prizes);
 }
 
@@ -150,8 +144,8 @@ function renderWheel(prizes) {
     const label = document.createElement("div");
     label.className = "wheel-label";
     const angle = index * slice + slice / 2 - 90;
-    const radiusScale = crowded ? 0.38 : dense ? 0.35 : 0.32;
-    const radius = Math.max(84, Math.min(182, wheel.clientWidth * radiusScale));
+    const radiusScale = crowded ? 0.4 : dense ? 0.37 : 0.34;
+    const radius = Math.max(94, Math.min(190, wheel.clientWidth * radiusScale));
     label.style.transform = `translate(-50%, -50%) rotate(${angle}deg) translateY(-${radius}px) rotate(${-angle}deg)`;
 
     if (prize.image_url) {
@@ -195,7 +189,7 @@ function spinToPrize(prize, updatedCampaign) {
     resultPanel.classList.remove("is-hidden");
     renderCampaign(updatedCampaign);
     wheel.style.transform = `rotate(${currentRotation}deg)`;
-    setMessage("抽奖完成。", "success");
+    setMessage("Spin complete.", "success");
   }, 4200);
 }
 

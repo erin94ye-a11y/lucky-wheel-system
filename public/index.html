@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en-US">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>活动转盘抽奖</title>
+    <title>CryptoReward Lucky Wheel</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body class="public-page">
@@ -11,7 +11,6 @@
       <a class="brand" href="/" aria-label="CryptoReward">
         <span class="brand-word"><span>Crypto</span><strong>Reward</strong></span>
       </a>
-      <a class="topbar-cta" href="#codeForm">立即签到</a>
     </header>
 
     <main class="public-shell">
@@ -21,24 +20,24 @@
             id="codeInput"
             name="code"
             autocomplete="off"
-            placeholder="输入抽奖代码"
+            placeholder="Enter your code"
             aria-label="Lucky code"
             required
           />
-          <button type="submit">解锁抽奖</button>
+          <button type="submit">Unlock Spin</button>
         </form>
-        <div class="process-strip" aria-label="抽奖流程">
+        <div class="process-strip" aria-label="Draw steps">
           <div>
             <span>1</span>
-            <strong>输入代码</strong>
+            <strong>Enter Code</strong>
           </div>
           <div>
             <span>2</span>
-            <strong>验证资格</strong>
+            <strong>Verify Pass</strong>
           </div>
           <div>
             <span>3</span>
-            <strong>开始抽奖</strong>
+            <strong>Spin Wheel</strong>
           </div>
         </div>
         <p class="form-message" id="message" role="status"></p>
@@ -50,41 +49,39 @@
             <span></span>
           </div>
           <div>
-            <h2>好运正在等待入场</h2>
-            <p>确认代码后，这里会展示当前活动转盘、奖品池和剩余抽奖次数。</p>
+            <h2>Your wheel is ready</h2>
+            <p>After your code is verified, this area shows the prize wheel and remaining spin access.</p>
           </div>
         </div>
         <div class="comfort-grid">
           <div>
-            <strong>奖品池</strong>
-            <span>后台实时配置</span>
+            <strong>Prize Pool</strong>
+            <span>Managed in admin</span>
           </div>
           <div>
-            <strong>抽奖记录</strong>
-            <span>结果自动留存</span>
+            <strong>Draw Logs</strong>
+            <span>Results are saved</span>
           </div>
           <div>
-            <strong>次数核验</strong>
-            <span>防止重复使用</span>
+            <strong>Use Check</strong>
+            <span>Repeat protection</span>
           </div>
         </div>
       </section>
 
       <section class="wheel-stage" id="wheelStage" aria-live="polite">
         <div class="wheel-copy">
-          <p class="campaign-code" id="campaignCode">签到奖励</p>
-          <h2 id="campaignTitle">抽奖转盘</h2>
-          <p id="campaignMeta">输入代码后即可解锁一次机会。</p>
+          <h2 id="campaignTitle">Prize Wheel</h2>
         </div>
         <div class="wheel-wrap">
           <div class="wheel-pointer" aria-hidden="true"></div>
           <div class="wheel" id="wheel"></div>
-          <button class="spin-button" id="spinButton" type="button" disabled>输入代码</button>
+          <button class="spin-button" id="spinButton" type="button" disabled>Enter Code</button>
         </div>
         <div class="result-panel is-hidden" id="resultPanel">
           <img id="resultImage" alt="" />
           <div>
-            <p>中奖结果</p>
+            <p>Result</p>
             <h3 id="resultName"></h3>
           </div>
         </div>

@@ -9,6 +9,7 @@ import multer from "multer";
 import {
   bulkGenerateCampaignCodes,
   createCampaign,
+  deleteCampaign,
   generateCampaignCode,
   getCampaignByCode,
   listGlobalPrizes,
@@ -163,6 +164,15 @@ export function createApp(options = {}) {
       }
     });
 
+    app.delete("/api/admin/campaigns/:id", requireAdmin(sessionSecret), (request, response, next) => {
+      try {
+        const deleted = deleteCampaign(db, Number(request.params.id));
+        response.json({ deleted });
+      } catch (error) {
+        next(error);
+      }
+    });
+
     app.post(
       "/api/admin/upload",
       requireAdmin(sessionSecret),
@@ -220,7 +230,7 @@ export function createApp(options = {}) {
   app.use((error, _request, response, _next) => {
     const statusCode = error.statusCode || (error.message?.includes("image") ? 400 : 500);
     response.status(statusCode).json({
-      error: statusCode === 500 ? "服务器处理失败，请稍后再试。" : error.message
+      error: statusCode === 500 ? "Server failed to process the request. Please try again." : error.message
     });
   });
 

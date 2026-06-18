@@ -114,6 +114,18 @@ export function updateCampaign(db, id, input) {
   return saveCampaign(db, id, input);
 }
 
+export function deleteCampaign(db, id) {
+  const campaign = getCampaignById(db, id);
+  if (!campaign) {
+    const error = new Error("Campaign not found.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  db.prepare("DELETE FROM campaigns WHERE id = ?").run(id);
+  return campaign;
+}
+
 export function generateCampaignCode(db) {
   return ensureUniqueCode(db, null);
 }
@@ -154,7 +166,7 @@ export function replaceGlobalPrizes(db, input) {
 export function bulkGenerateCampaignCodes(db, input) {
   const transaction = db.transaction(() => {
     const quantity = Number.parseInt(input.quantity ?? 1, 10);
-    const title = String(input.title ?? "Lucky Draw").trim() || "Lucky Draw";
+    const title = "Lucky Draw";
     const maxUses = Number.parseInt(input.max_uses ?? 1, 10);
     const active = input.active === false || input.active === 0 || input.active === "0" ? 0 : 1;
     const expiresAt = input.expires_at ? String(input.expires_at) : null;
@@ -199,7 +211,7 @@ function saveCampaign(db, id, input) {
     }
 
     const code = ensureUniqueCode(db, input.code || existing?.code, id);
-    const title = String(input.title ?? existing?.title ?? "幸运转盘").trim() || "幸运转盘";
+    const title = String(input.title ?? existing?.title ?? "Lucky Draw").trim() || "Lucky Draw";
     const maxUses = Number.parseInt(input.max_uses ?? existing?.max_uses ?? 1, 10);
     const active = input.active === false || input.active === 0 || input.active === "0" ? 0 : 1;
     const expiresAt = input.expires_at ? String(input.expires_at) : null;
@@ -286,7 +298,7 @@ export function performDraw(db, code, requestMeta) {
     try {
       selectedPrize = pickPrize(campaign.prizes);
     } catch {
-      const error = new Error("奖品库存已用完，请联系活动管理员。");
+      const error = new Error("Prize inventory is sold out. Please contact the campaign administrator.");
       error.statusCode = 400;
       throw error;
     }
@@ -327,25 +339,25 @@ export function performDraw(db, code, requestMeta) {
 
 export function validateDrawableCampaign(campaign) {
   if (!campaign) {
-    const error = new Error("抽奖代码不存在。");
+    const error = new Error("Lottery code not found.");
     error.statusCode = 404;
     throw error;
   }
 
   if (!campaign.active) {
-    const error = new Error("这个抽奖代码暂未启用。");
+    const error = new Error("This lottery code is not active yet.");
     error.statusCode = 400;
     throw error;
   }
 
   if (campaign.expires_at && new Date(campaign.expires_at).getTime() < Date.now()) {
-    const error = new Error("这个抽奖代码已过期。");
+    const error = new Error("This lottery code has expired.");
     error.statusCode = 400;
     throw error;
   }
 
   if (campaign.used_count >= campaign.max_uses) {
-    const error = new Error("这个抽奖代码的抽奖次数已用完。");
+    const error = new Error("This lottery code has no spins left.");
     error.statusCode = 400;
     throw error;
   }
@@ -403,7 +415,6 @@ export function publicCampaign(campaign, options = {}) {
   return {
     id: campaign.id,
     code: campaign.code,
-    title: campaign.title,
     max_uses: campaign.max_uses,
     used_count: campaign.used_count,
     expires_at: campaign.expires_at,

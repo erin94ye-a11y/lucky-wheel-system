@@ -7,7 +7,6 @@ const refreshButton = document.querySelector("#refreshButton");
 const campaignList = document.querySelector("#campaignList");
 const codeCount = document.querySelector("#codeCount");
 const codeGeneratorForm = document.querySelector("#codeGeneratorForm");
-const codeTitleInput = document.querySelector("#codeTitleInput");
 const quantityInput = document.querySelector("#quantityInput");
 const maxUsesInput = document.querySelector("#maxUsesInput");
 const expiresInput = document.querySelector("#expiresInput");
@@ -63,7 +62,6 @@ codeGeneratorForm.addEventListener("submit", async (event) => {
   const response = await api("/api/admin/codes/bulk", {
     method: "POST",
     body: {
-      title: codeTitleInput.value,
       quantity: Number(quantityInput.value),
       max_uses: Number(maxUsesInput.value),
       expires_at: expiresInput.value ? new Date(expiresInput.value).toISOString() : null,
@@ -152,14 +150,7 @@ function renderCampaignList() {
   }
 
   for (const campaign of campaigns) {
-    const item = document.createElement("div");
-    item.className = "campaign-item";
-    item.innerHTML = `
-      <strong>${escapeHtml(campaign.code)}</strong>
-      <span>${escapeHtml(campaign.title)} · ${campaign.used_count}/${campaign.max_uses} 次</span>
-      <span>${campaign.active ? "已启用" : "已停用"}</span>
-    `;
-    campaignList.append(item);
+    campaignList.append(createCampaignCodeItem(campaign));
   }
 }
 
@@ -168,14 +159,48 @@ function renderGeneratedCodes(codes) {
   generatedCodes.innerHTML = "";
 
   for (const campaign of codes) {
-    const item = document.createElement("div");
-    item.className = "generated-code-item";
-    item.innerHTML = `
-      <strong>${escapeHtml(campaign.code)}</strong>
-      <span>${escapeHtml(campaign.title)}</span>
-    `;
-    generatedCodes.append(item);
+    generatedCodes.append(createCampaignCodeItem(campaign, "generated-code-item"));
   }
+}
+
+function createCampaignCodeItem(campaign, className = "campaign-item") {
+  const item = document.createElement("div");
+  item.className = className;
+  item.innerHTML = `
+    <div class="campaign-item-body">
+      <strong>${escapeHtml(campaign.code)}</strong>
+      <span>${campaign.used_count}/${campaign.max_uses} 次 · ${campaign.active ? "已启用" : "已停用"}</span>
+    </div>
+  `;
+
+  const button = document.createElement("button");
+  button.className = "code-delete-button";
+  button.type = "button";
+  button.textContent = "删除";
+  button.addEventListener("click", () => {
+    deleteCampaign(campaign);
+  });
+  item.append(button);
+  return item;
+}
+
+async function deleteCampaign(campaign) {
+  if (!window.confirm(`确认删除代码 ${campaign.code}？`)) {
+    return;
+  }
+
+  setState(codeState, "正在删除代码...", "muted");
+  const response = await api(`/api/admin/campaigns/${campaign.id}`, {
+    method: "DELETE"
+  });
+
+  if (!response.ok) {
+    setState(codeState, response.error || "代码删除失败", "error");
+    return;
+  }
+
+  setState(codeState, `已删除代码 ${campaign.code}`, "success");
+  await refreshAll();
 }
 
 function renderPrizeSettings(prizes) {
