@@ -57,6 +57,38 @@ test("public mode does not expose admin login page or admin APIs", async (t) => 
   assert.equal(adminApi.status, 404);
 });
 
+test("public H5 page hides the privacy note and ships nine fallback prize categories", async (t) => {
+  const server = startTestServer({ mode: "public" });
+  t.after(server.close);
+
+  const page = await server.request("/", {
+    headers: { accept: "text/html" }
+  });
+  assert.equal(page.status, 200);
+  assert.doesNotMatch(page.body, /参与抽奖会记录服务器可见 IP/);
+
+  const script = await server.request("/app.js", {
+    headers: { accept: "text/javascript" }
+  });
+  assert.equal(script.status, 200);
+  const fallbackPrizeNames = [
+    "Grand Prize",
+    "$100 Gift Card",
+    "Bluetooth Speaker",
+    "Coffee Voucher",
+    "VIP Upgrade",
+    "Movie Tickets",
+    "Merch Bundle",
+    "Bonus Entry",
+    "Try Again"
+  ];
+  const defaultPrizePoolSource = script.body.slice(script.body.indexOf("function defaultPrizePool"));
+  assert.equal(
+    fallbackPrizeNames.filter((name) => defaultPrizePoolSource.includes(`name: "${name}"`)).length,
+    9
+  );
+});
+
 test("admin mode serves the login page separately and hides public APIs", async (t) => {
   const server = startTestServer({ mode: "admin" });
   t.after(server.close);

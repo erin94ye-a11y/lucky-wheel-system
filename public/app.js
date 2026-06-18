@@ -14,7 +14,17 @@ const resultPanel = document.querySelector("#resultPanel");
 const resultImage = document.querySelector("#resultImage");
 const resultName = document.querySelector("#resultName");
 
-const segmentColors = ["#e23d57", "#078f8a", "#1d3557", "#f5b942", "#8e5cf4", "#f97316"];
+const segmentColors = [
+  "#e23d57",
+  "#078f8a",
+  "#1d3557",
+  "#f5b942",
+  "#8e5cf4",
+  "#f97316",
+  "#2f80ed",
+  "#16a34a",
+  "#6d5dfc"
+];
 
 let activeCampaign = null;
 let currentRotation = 0;
@@ -126,6 +136,8 @@ function renderCampaign(campaign) {
 
 function renderWheel(prizes) {
   const slice = 360 / prizes.length;
+  const dense = prizes.length >= 7;
+  const crowded = prizes.length >= 9;
   const gradient = prizes
     .map((_, index) => {
       const color = segmentColors[index % segmentColors.length];
@@ -134,13 +146,16 @@ function renderWheel(prizes) {
     .join(", ");
 
   wheel.style.background = `conic-gradient(from -90deg, ${gradient})`;
+  wheel.classList.toggle("is-dense", dense);
+  wheel.classList.toggle("is-crowded", crowded);
   wheel.innerHTML = "";
 
   prizes.forEach((prize, index) => {
     const label = document.createElement("div");
     label.className = "wheel-label";
     const angle = index * slice + slice / 2 - 90;
-    const radius = Math.max(84, Math.min(170, wheel.clientWidth * 0.32));
+    const radiusScale = crowded ? 0.38 : dense ? 0.35 : 0.32;
+    const radius = Math.max(84, Math.min(182, wheel.clientWidth * radiusScale));
     label.style.transform = `translate(-50%, -50%) rotate(${angle}deg) translateY(-${radius}px) rotate(${-angle}deg)`;
 
     if (prize.image_url) {
@@ -228,7 +243,13 @@ function setMessage(text, type) {
 function defaultPrizePool() {
   return [
     { name: "Grand Prize", image_url: "", available: null },
-    { name: "Gift Card", image_url: "", available: null },
+    { name: "$100 Gift Card", image_url: "", available: null },
+    { name: "Bluetooth Speaker", image_url: "", available: null },
+    { name: "Coffee Voucher", image_url: "", available: null },
+    { name: "VIP Upgrade", image_url: "", available: null },
+    { name: "Movie Tickets", image_url: "", available: null },
+    { name: "Merch Bundle", image_url: "", available: null },
+    { name: "Bonus Entry", image_url: "", available: null },
     { name: "Try Again", image_url: "", available: null }
   ];
 }
