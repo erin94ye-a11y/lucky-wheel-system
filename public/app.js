@@ -8,8 +8,8 @@ const spinButton = document.querySelector("#spinButton");
 const campaignCode = document.querySelector("#campaignCode");
 const campaignTitle = document.querySelector("#campaignTitle");
 const campaignMeta = document.querySelector("#campaignMeta");
-const prizePreview = document.querySelector("#prizePreview");
-const prizeCount = document.querySelector("#prizeCount");
+const winnerFeed = document.querySelector("#winnerFeed");
+const winnerCount = document.querySelector("#winnerCount");
 const resultPanel = document.querySelector("#resultPanel");
 const resultImage = document.querySelector("#resultImage");
 const resultName = document.querySelector("#resultName");
@@ -32,7 +32,7 @@ let isSpinning = false;
 
 codeForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  setMessage("Checking your code...", "");
+  setMessage("正在验证抽奖代码...", "");
   resultPanel.classList.add("is-hidden");
 
   try {
@@ -45,7 +45,7 @@ codeForm.addEventListener("submit", async (event) => {
 
     activeCampaign = data.campaign;
     renderCampaign(activeCampaign);
-    setMessage("Code verified. Your spin is ready.", "success");
+    setMessage("代码已验证，可以立即抽奖。", "success");
   } catch (error) {
     setMessage(error.message, "error");
   }
@@ -59,7 +59,7 @@ spinButton.addEventListener("click", async () => {
   isSpinning = true;
   spinButton.disabled = true;
   resultPanel.classList.add("is-hidden");
-  setMessage("Spinning...", "");
+  setMessage("抽奖中...", "");
 
   try {
     const response = await fetch("/api/public/draw", {
@@ -69,7 +69,7 @@ spinButton.addEventListener("click", async () => {
     });
     const data = await response.json();
     if (!response.ok) {
-      throw new Error(data.error || "Unable to complete the draw.");
+      throw new Error(data.error || "抽奖失败，请稍后再试。");
     }
 
     spinToPrize(data.prize, data.campaign);
@@ -106,15 +106,15 @@ async function loadPrizePool() {
 
 function renderStaticPrizePool(prizes) {
   activeCampaign = null;
-  campaignCode.textContent = "Live prize pool";
-  campaignTitle.textContent = "Prize Lineup";
-  campaignMeta.textContent = "Enter your code to unlock one spin.";
+  campaignCode.textContent = "签到奖励";
+  campaignTitle.textContent = "抽奖转盘";
+  campaignMeta.textContent = "输入代码后即可解锁一次机会。";
   welcomeStage.classList.add("is-hidden");
   wheelStage.classList.remove("is-hidden");
   spinButton.disabled = true;
-  spinButton.textContent = "Enter Code";
+  spinButton.textContent = "输入代码";
   renderWheel(prizes);
-  renderPrizePreview(prizes);
+  renderWinnerFeed(prizes);
 }
 
 function renderCampaign(campaign) {
@@ -126,12 +126,12 @@ function renderCampaign(campaign) {
   welcomeStage.classList.add("is-hidden");
   wheelStage.classList.remove("is-hidden");
   spinButton.disabled = remaining <= 0;
-  spinButton.textContent = remaining <= 0 ? "Used" : "Spin Now";
+  spinButton.textContent = remaining <= 0 ? "已使用" : "立即抽奖";
   isSpinning = false;
 
   const prizes = campaign.prizes.length ? campaign.prizes : [{ name: "暂无奖品" }];
   renderWheel(prizes);
-  renderPrizePreview(prizes);
+  renderWinnerFeed(prizes);
 }
 
 function renderWheel(prizes) {
@@ -172,35 +172,42 @@ function renderWheel(prizes) {
   });
 }
 
-function renderPrizePreview(prizes) {
-  prizeCount.textContent = `${prizes.length} 项`;
-  prizePreview.innerHTML = "";
+function renderWinnerFeed(prizes) {
+  const records = createWinnerRecords(prizes);
+  winnerCount.textContent = `${records.length} 条`;
+  winnerFeed.innerHTML = "";
 
-  prizes.forEach((prize, index) => {
+  [...records, ...records].forEach((record, index) => {
     const item = document.createElement("div");
-    item.className = "prize-preview-item";
+    item.className = "winner-item";
+    item.style.setProperty("--item-color", segmentColors[index % segmentColors.length]);
+    item.innerHTML = `
+      <div class="winner-icon">${escapeHtml(record.prize.slice(0, 1))}</div>
+      <div class="winner-main">
+        <span class="winner-label">中奖代码</span>
+        <strong class="winner-code">${escapeHtml(record.code)}</strong>
+      </div>
+      <div class="winner-main">
+        <span class="winner-label">中奖奖品</span>
+        <strong class="winner-prize">${escapeHtml(record.prize)}</strong>
+      </div>
+      <time class="winner-time">${escapeHtml(record.time)}</time>
+    `;
+    winnerFeed.append(item);
+  });
+}
 
-    const thumb = document.createElement("div");
-    thumb.className = "prize-thumb";
-    thumb.style.background = segmentColors[index % segmentColors.length];
-
-    if (prize.image_url) {
-      const image = document.createElement("img");
-      image.src = prize.image_url;
-      image.alt = "";
-      thumb.append(image);
-    } else {
-      thumb.textContent = prize.name.slice(0, 1);
-    }
-
-    const detail = document.createElement("div");
-    const name = document.createElement("strong");
-    name.textContent = prize.name;
-    const stock = document.createElement("span");
-    stock.textContent = prize.available === null ? "库存不限" : `剩余 ${prize.available}`;
-    detail.append(name, stock);
-    item.append(thumb, detail);
-    prizePreview.append(item);
+function createWinnerRecords(prizes) {
+  const pool = prizes.length ? prizes : defaultPrizePool();
+  const now = new Date();
+  return pool.slice(0, 9).map((prize, index) => {
+    const minutesAgo = 3 + index * 7;
+    const time = new Date(now.getTime() - minutesAgo * 60 * 1000);
+    return {
+      code: `CR${String(7300 + index * 47).padStart(4, "0")}****${index + 1}`,
+      prize: prize.name,
+      time: time.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false })
+    };
   });
 }
 
@@ -231,13 +238,22 @@ function spinToPrize(prize, updatedCampaign) {
     resultPanel.classList.remove("is-hidden");
     renderCampaign(updatedCampaign);
     wheel.style.transform = `rotate(${currentRotation}deg)`;
-    setMessage("Spin complete.", "success");
+    setMessage("抽奖完成。", "success");
   }, 4200);
 }
 
 function setMessage(text, type) {
   message.textContent = text;
   message.className = `form-message ${type || ""}`.trim();
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 function defaultPrizePool() {

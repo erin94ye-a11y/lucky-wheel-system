@@ -89,6 +89,29 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
   );
 });
 
+test("public page uses the reward style and replaces prize list with a winner carousel", async (t) => {
+  const server = startTestServer({ mode: "public" });
+  t.after(server.close);
+
+  const page = await server.request("/", {
+    headers: { accept: "text/html" }
+  });
+  assert.equal(page.status, 200);
+  assert.match(page.body, /CryptoReward/);
+  assert.match(page.body, /winnerFeed/);
+  assert.match(page.body, /中奖动态/);
+  assert.doesNotMatch(page.body, /本次奖品/);
+
+  const script = await server.request("/app.js", {
+    headers: { accept: "text/javascript" }
+  });
+  assert.equal(script.status, 200);
+  assert.match(script.body, /renderWinnerFeed/);
+  assert.match(script.body, /winner-code/);
+  assert.match(script.body, /winner-prize/);
+  assert.match(script.body, /winner-time/);
+});
+
 test("admin mode serves the login page separately and hides public APIs", async (t) => {
   const server = startTestServer({ mode: "admin" });
   t.after(server.close);

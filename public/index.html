@@ -8,26 +8,37 @@
   </head>
   <body class="public-page">
     <header class="topbar">
-      <a class="brand" href="/">
-        <span class="brand-mark">L</span>
-        <span>Lucky Wheel</span>
+      <a class="brand" href="/" aria-label="CryptoReward">
+        <span class="brand-word"><span>Crypto</span><strong>Reward</strong></span>
       </a>
-      <div class="topbar-note">
-        <span></span>
-        <strong>Live verification</strong>
-      </div>
+      <a class="topbar-cta" href="#codeForm">立即签到</a>
     </header>
 
     <main class="public-shell">
       <section class="entry-panel" id="entryPanel">
         <div class="entry-copy">
-          <h1>Unlock your spin</h1>
-          <p>Enter your giveaway code to reveal one verified spin. Rewards, inventory, and results are synced in real time.</p>
+          <p class="reward-kicker">每日签到 · 累计赢奖励</p>
+          <h1><span>每日签到</span><strong>累计天数</strong><em>赢奖励</em></h1>
+          <p>输入您的抽奖码即可解锁一次抽奖机会，奖品、库存和结果会由系统实时同步。</p>
+        </div>
+        <div class="stats-strip" aria-label="活动数据">
+          <div>
+            <strong>0</strong>
+            <span>我的签到天数</span>
+          </div>
+          <div>
+            <strong>—</strong>
+            <span>总参与人数</span>
+          </div>
+          <div>
+            <strong>0</strong>
+            <span>今日签到</span>
+          </div>
         </div>
         <div class="ticket-preview" aria-hidden="true">
           <div>
-            <span>Lucky Pass</span>
-            <strong>Summer Rewards</strong>
+            <span>每日签到</span>
+            <strong>累计赢奖励</strong>
           </div>
           <p>CODE</p>
         </div>
@@ -36,24 +47,24 @@
             id="codeInput"
             name="code"
             autocomplete="off"
-            placeholder="SUMMER2026"
+            placeholder="输入抽奖代码"
             aria-label="Lucky code"
             required
           />
-          <button type="submit">Unlock Spin</button>
+          <button type="submit">解锁抽奖</button>
         </form>
         <div class="process-strip" aria-label="抽奖流程">
           <div>
             <span>1</span>
-            <strong>Enter code</strong>
+            <strong>输入代码</strong>
           </div>
           <div>
             <span>2</span>
-            <strong>Verify pass</strong>
+            <strong>验证资格</strong>
           </div>
           <div>
             <span>3</span>
-            <strong>Spin wheel</strong>
+            <strong>开始抽奖</strong>
           </div>
         </div>
         <p class="form-message" id="message" role="status"></p>
@@ -87,21 +98,26 @@
 
       <section class="wheel-stage" id="wheelStage" aria-live="polite">
         <div class="wheel-copy">
-          <p class="campaign-code" id="campaignCode">Live prize pool</p>
-          <h2 id="campaignTitle">Prize Lineup</h2>
-          <p id="campaignMeta">Enter your code to unlock one spin.</p>
+          <p class="campaign-code" id="campaignCode">签到奖励</p>
+          <h2 id="campaignTitle">抽奖转盘</h2>
+          <p id="campaignMeta">输入代码后即可解锁一次机会。</p>
         </div>
         <div class="wheel-wrap">
           <div class="wheel-pointer" aria-hidden="true"></div>
           <div class="wheel" id="wheel"></div>
           <button class="spin-button" id="spinButton" type="button" disabled>输入代码</button>
         </div>
-        <aside class="prize-preview-panel">
-          <div class="prize-preview-title">
-            <h3>本次奖品</h3>
-            <span id="prizeCount"></span>
+        <aside class="winner-feed-panel">
+          <div class="winner-feed-title">
+            <div>
+              <p>中奖播报</p>
+              <h3>中奖动态</h3>
+            </div>
+            <span id="winnerCount"></span>
           </div>
-          <div class="prize-preview-grid" id="prizePreview"></div>
+          <div class="winner-feed-window" aria-label="虚拟中奖动态">
+            <div class="winner-feed" id="winnerFeed"></div>
+          </div>
         </aside>
         <div class="result-panel is-hidden" id="resultPanel">
           <img id="resultImage" alt="" />
