@@ -89,7 +89,7 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
   );
 });
 
-test("public page uses the reward style and replaces prize list with a winner carousel", async (t) => {
+test("public page keeps the code entry flow and removes the unused reward intro", async (t) => {
   const server = startTestServer({ mode: "public" });
   t.after(server.close);
 
@@ -100,6 +100,11 @@ test("public page uses the reward style and replaces prize list with a winner ca
   assert.match(page.body, /CryptoReward/);
   assert.match(page.body, /winnerFeed/);
   assert.match(page.body, /中奖动态/);
+  assert.match(page.body, /输入抽奖代码/);
+  assert.doesNotMatch(page.body, /reward-kicker/);
+  assert.doesNotMatch(page.body, /stats-strip/);
+  assert.doesNotMatch(page.body, /ticket-preview/);
+  assert.doesNotMatch(page.body, /累计天数/);
   assert.doesNotMatch(page.body, /本次奖品/);
 
   const script = await server.request("/app.js", {
