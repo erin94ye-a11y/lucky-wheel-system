@@ -74,6 +74,17 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
   });
   assert.equal(script.status, 200);
   assert.doesNotMatch(script.body, /[\u3400-\u9fff]/);
+  assert.match(script.body, /--label-x/);
+  assert.match(script.body, /--label-y/);
+  assert.match(script.body, /--label-width/);
+
+  const styles = await server.request("/styles.css", {
+    headers: { accept: "text/css" }
+  });
+  assert.equal(styles.status, 200);
+  assert.match(styles.body, /transform:\s*translate\(-50%, -50%\) translate\(var\(--label-x\), var\(--label-y\)\)/);
+  assert.match(styles.body, /width:\s*var\(--label-width\)/);
+
   const fallbackPrizeNames = [
     "Grand Prize",
     "$100 Gift Card",

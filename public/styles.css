@@ -503,38 +503,34 @@ button.danger:hover {
   align-items: center;
   color: #fff;
   display: flex;
-  flex-direction: column;
-  font-size: 17px;
+  font-size: var(--label-font-size, 15px);
   font-weight: 900;
-  gap: 6px;
+  justify-content: center;
   left: 50%;
-  line-height: 1.2;
-  max-width: 124px;
+  line-height: 1.08;
   position: absolute;
   text-align: center;
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.36);
   top: 50%;
+  transform: translate(-50%, -50%) translate(var(--label-x), var(--label-y));
   transform-origin: center center;
+  width: var(--label-width);
   z-index: 2;
 }
 
 .wheel-label span {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  display: block;
+  min-width: 0;
   overflow-wrap: anywhere;
+  text-wrap: balance;
 }
 
 .wheel.is-dense .wheel-label {
-  font-size: 15px;
   gap: 4px;
-  max-width: 110px;
 }
 
 .wheel.is-crowded .wheel-label {
-  font-size: 14px;
-  max-width: 104px;
+  gap: 0;
 }
 
 .wheel.is-crowded .wheel-label img {
@@ -1272,8 +1268,7 @@ td {
   }
 
   .wheel-label {
-    font-size: 13px;
-    max-width: 88px;
+    line-height: 1.05;
   }
 
   .wheel-label img {

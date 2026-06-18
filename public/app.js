@@ -144,9 +144,11 @@ function renderWheel(prizes) {
     const label = document.createElement("div");
     label.className = "wheel-label";
     const angle = index * slice + slice / 2 - 90;
-    const radiusScale = crowded ? 0.4 : dense ? 0.37 : 0.34;
-    const radius = Math.max(94, Math.min(190, wheel.clientWidth * radiusScale));
-    label.style.transform = `translate(-50%, -50%) rotate(${angle}deg) translateY(-${radius}px) rotate(${-angle}deg)`;
+    const labelMetrics = getWheelLabelMetrics(prize.name, prizes.length, angle);
+    label.style.setProperty("--label-x", `${labelMetrics.x}px`);
+    label.style.setProperty("--label-y", `${labelMetrics.y}px`);
+    label.style.setProperty("--label-width", `${labelMetrics.width}px`);
+    label.style.setProperty("--label-font-size", `${labelMetrics.fontSize}px`);
 
     if (prize.image_url) {
       const image = document.createElement("img");
@@ -160,6 +162,52 @@ function renderWheel(prizes) {
     label.append(name);
     wheel.append(label);
   });
+}
+
+function getWheelLabelMetrics(name, prizeCount, angle) {
+  const wheelSize = wheel.offsetWidth || wheel.clientWidth || 320;
+  const wheelRadius = wheelSize / 2;
+  const buttonRadius = (spinButton.offsetWidth || wheelSize * 0.28) / 2;
+  const crowded = prizeCount >= 9;
+  const dense = prizeCount >= 7;
+  const fontSize = getWheelLabelFontSize(name, prizeCount);
+  const width = Math.round(
+    crowded
+      ? Math.min(86, Math.max(72, wheelRadius * 0.46))
+      : Math.min(dense ? 118 : 140, Math.max(72, wheelRadius * 0.62))
+  );
+  const lineEstimate = Math.max(1, Math.ceil(String(name || "").length / Math.max(6, width / (fontSize * 0.58))));
+  const labelHeight = Math.min(3, lineEstimate) * fontSize * 1.08;
+  const margin = crowded ? 4 : dense ? 20 : 24;
+  const radians = (angle * Math.PI) / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  const maximumXDistance = Math.abs(cos) > 0.04 ? (wheelRadius - width / 2 - margin) / Math.abs(cos) : Number.POSITIVE_INFINITY;
+  const maximumYDistance = Math.abs(sin) > 0.04 ? (wheelRadius - labelHeight / 2 - margin) / Math.abs(sin) : Number.POSITIVE_INFINITY;
+  const minimumDistance = buttonRadius + labelHeight / 2 + (crowded ? 16 : 18);
+  const preferredDistance = wheelRadius * (crowded ? 0.78 : dense ? 0.54 : 0.5);
+  const maximumDistance = Math.max(minimumDistance, Math.min(maximumXDistance, maximumYDistance));
+  const distance = Math.min(Math.max(preferredDistance, minimumDistance), maximumDistance);
+
+  return {
+    fontSize,
+    width,
+    x: Math.round(cos * distance),
+    y: Math.round(sin * distance)
+  };
+}
+
+function getWheelLabelFontSize(name, prizeCount) {
+  const length = String(name || "").length;
+  if (prizeCount >= 9) {
+    return length > 14 ? 12 : 14;
+  }
+
+  if (prizeCount >= 7) {
+    return length > 16 ? 13 : 15;
+  }
+
+  return length > 18 ? 14 : 17;
 }
 
 function spinToPrize(prize, updatedCampaign) {
