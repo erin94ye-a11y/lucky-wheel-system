@@ -1,0 +1,19 @@
+{
+  "name": "lucky-wheel-system",
+  "version": "1.0.0",
+  "description": "A Railway-deployable lottery wheel system with admin-controlled codes, prizes, probabilities, images, and draw logs.",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.9.1",
+    "express": "^4.21.2",
+    "multer": "^2.2.0"
+  }
+}

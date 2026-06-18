@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>活动转盘抽奖</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="public-page">
+    <header class="topbar">
+      <a class="brand" href="/">
+        <span class="brand-mark">奖</span>
+        <span>活动转盘</span>
+      </a>
+      <a class="ghost-link" href="/admin.html">后台</a>
+    </header>
+
+    <main class="public-shell">
+      <section class="entry-panel" id="entryPanel">
+        <div>
+          <h1>输入抽奖代码</h1>
+          <p>提交后系统会校验代码，并由服务器计算中奖结果。</p>
+        </div>
+        <form id="codeForm" class="code-form">
+          <input
+            id="codeInput"
+            name="code"
+            autocomplete="off"
+            placeholder="例如 TEST2026"
+            aria-label="抽奖代码"
+            required
+          />
+          <button type="submit">确认代码</button>
+        </form>
+        <p class="privacy-note">
+          参与抽奖会记录服务器可见 IP、转发 IP 和浏览器信息，用于活动核验和异常排查。
+        </p>
+        <p class="form-message" id="message" role="status"></p>
+      </section>
+
+      <section class="wheel-stage is-hidden" id="wheelStage" aria-live="polite">
+        <div class="wheel-copy">
+          <p class="campaign-code" id="campaignCode"></p>
+          <h2 id="campaignTitle">幸运转盘</h2>
+          <p id="campaignMeta"></p>
+        </div>
+        <div class="wheel-wrap">
+          <div class="wheel-pointer" aria-hidden="true"></div>
+          <div class="wheel" id="wheel"></div>
+          <button class="spin-button" id="spinButton" type="button">开始抽奖</button>
+        </div>
+        <div class="result-panel is-hidden" id="resultPanel">
+          <img id="resultImage" alt="" />
+          <div>
+            <p>中奖结果</p>
+            <h3 id="resultName"></h3>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
