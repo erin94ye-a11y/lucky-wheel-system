@@ -74,13 +74,15 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
   });
   assert.equal(script.status, 200);
   assert.doesNotMatch(script.body, /[\u3400-\u9fff]/);
-  assert.match(script.body, /--label-x/);
-  assert.match(script.body, /--label-y/);
   assert.match(script.body, /--label-width/);
+  assert.match(script.body, /--label-track-offset/);
+  assert.match(script.body, /--label-track-height/);
   assert.match(script.body, /getWheelLabelLines/);
   assert.match(script.body, /getWheelLayout/);
-  assert.match(script.body, /rectIntersects/);
+  assert.match(script.body, /getWheelLabelMetrics/);
   assert.match(script.body, /getSpinRotation/);
+  assert.match(script.body, /--label-rotation/);
+  assert.match(script.body, /--label-track-width/);
   assert.doesNotMatch(script.body, /getWheelSegments/);
   assert.doesNotMatch(script.body, /getPrizeWeight/);
   assert.match(script.body, /const slice = 360 \/ prizes\.length/);
@@ -89,7 +91,10 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
     headers: { accept: "text/css" }
   });
   assert.equal(styles.status, 200);
-  assert.match(styles.body, /transform:\s*translate\(-50%, -50%\) translate\(var\(--label-x\), var\(--label-y\)\)/);
+  assert.match(styles.body, /rotate\(var\(--label-rotation\)\)/);
+  assert.match(styles.body, /translateX\(var\(--label-track-offset\)\)/);
+  assert.match(styles.body, /width:\s*var\(--label-track-width\)/);
+  assert.match(styles.body, /--label-text-rotation/);
   assert.match(styles.body, /width:\s*var\(--label-width\)/);
   assert.match(styles.body, /\.wheel-label-line/);
 
