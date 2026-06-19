@@ -69,7 +69,7 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
   assert.doesNotMatch(page.body, /[\u3400-\u9fff]/);
   assert.doesNotMatch(page.body, /topbar-cta/);
   assert.doesNotMatch(page.body, /CryptoReward/);
-  assert.match(page.body, /Jump Quantum/);
+  assert.match(page.body, /JUMP QUANTUM™/);
   assert.match(page.body, /INVESTOR REWARDS EVENT/);
   assert.match(page.body, /\/assets\/jump-quantum-logo\.png/);
 
@@ -101,6 +101,9 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
   assert.match(styles.body, /--label-text-rotation/);
   assert.match(styles.body, /width:\s*var\(--label-width\)/);
   assert.match(styles.body, /\.wheel-label-line/);
+  assert.match(styles.body, /\.public-page \.topbar\s*{[^}]*flex-direction:\s*column/s);
+  assert.match(styles.body, /\.public-page \.topbar\s*{[^}]*align-items:\s*flex-start/s);
+  assert.match(styles.body, /\.event-title\s*{[^}]*text-align:\s*left/s);
 
   const fallbackPrizeNames = [
     "Grand Prize",
@@ -128,7 +131,7 @@ test("public page keeps the code entry flow and removes the unused reward intro"
     headers: { accept: "text/html" }
   });
   assert.equal(page.status, 200);
-  assert.match(page.body, /Jump Quantum/);
+  assert.match(page.body, /JUMP QUANTUM™/);
   assert.match(page.body, /INVESTOR REWARDS EVENT/);
   assert.match(page.body, /Enter your code/);
   assert.match(page.body, /Prize Wheel/);

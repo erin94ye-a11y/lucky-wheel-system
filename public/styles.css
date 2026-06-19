@@ -100,8 +100,8 @@ input:focus {
   background: #fff;
   border-radius: 8px;
   display: block;
-  height: clamp(42px, 8vw, 58px);
-  max-width: min(54vw, 210px);
+  height: clamp(50px, 13vw, 58px);
+  max-width: min(86vw, 148px);
   object-fit: contain;
   width: auto;
 }
@@ -643,12 +643,14 @@ body.public-page {
 }
 
 .public-page .topbar {
+  align-items: flex-start;
   background: rgba(5, 11, 22, 0.86);
   border-bottom: 1px solid rgba(86, 112, 151, 0.24);
-  gap: 16px;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 8px;
+  justify-content: flex-start;
   left: 0;
-  padding: 22px clamp(18px, 5vw, 44px);
+  padding: 18px clamp(18px, 5vw, 44px) 12px;
   position: sticky;
   right: 0;
   top: 0;
@@ -662,7 +664,7 @@ body.public-page {
   letter-spacing: 0;
   line-height: 1.2;
   margin: 0;
-  text-align: right;
+  text-align: left;
 }
 
 .brand-word {
@@ -1200,8 +1202,6 @@ td {
   }
 
   .public-page .topbar {
-    align-items: flex-start;
-    flex-direction: column;
     gap: 10px;
     padding: 14px 14px 10px;
   }
@@ -1211,13 +1211,12 @@ td {
   }
 
   .brand-logo {
-    height: 46px;
-    max-width: min(86vw, 220px);
+    height: 56px;
+    max-width: min(86vw, 140px);
   }
 
   .event-title {
     font-size: 12px;
-    text-align: left;
   }
 
   .topbar-cta {
