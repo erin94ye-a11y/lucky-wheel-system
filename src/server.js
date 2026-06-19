@@ -29,7 +29,7 @@ const __dirname = dirname(__filename);
 const projectRoot = join(__dirname, "..");
 
 const COOKIE_NAME = "lucky_admin";
-const PRIZE_IMAGE_SIZE = 96;
+const PRIZE_IMAGE_SIZE = 192;
 
 export function createApp(options = {}) {
   const app = express();
@@ -249,6 +249,7 @@ async function savePrizeImage(file, uploadDir) {
   try {
     await sharp(file.buffer)
       .rotate()
+      .trim({ threshold: 12 })
       .resize(PRIZE_IMAGE_SIZE, PRIZE_IMAGE_SIZE, {
         fit: "cover",
         position: "center"

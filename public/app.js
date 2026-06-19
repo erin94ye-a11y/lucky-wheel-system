@@ -151,9 +151,27 @@ function renderWheel(prizes) {
 
   const wheelLayout = getWheelLayout();
   prizes.forEach((prize, index) => {
+    const angle = index * slice + slice / 2 - 90;
+
+    if (prize.image_url) {
+      const imageMetrics = getWheelImageMetrics(prizes.length, angle, wheelLayout);
+      const imageFrame = document.createElement("span");
+      imageFrame.className = "wheel-prize-image";
+      imageFrame.style.setProperty("--wheel-image-size", `${imageMetrics.size}px`);
+      imageFrame.style.left = `${imageMetrics.x}px`;
+      imageFrame.style.top = `${imageMetrics.y}px`;
+
+      const image = document.createElement("img");
+      image.src = prize.image_url;
+      image.alt = "";
+      image.loading = "lazy";
+      image.decoding = "async";
+      imageFrame.append(image);
+      wheel.append(imageFrame);
+    }
+
     const label = document.createElement("div");
     label.className = "wheel-label";
-    const angle = index * slice + slice / 2 - 90;
     const nameLines = getWheelLabelLines(prize.name, prizes.length);
     const labelMetrics = getWheelLabelMetrics(nameLines, prizes.length, angle, wheelLayout);
     label.style.setProperty("--label-width", `${labelMetrics.width}px`);
@@ -164,13 +182,6 @@ function renderWheel(prizes) {
     label.style.setProperty("--label-text-rotation", `${labelMetrics.textRotation}deg`);
     label.style.setProperty("--label-font-size", `${labelMetrics.fontSize}px`);
     label.classList.toggle("is-flipped", labelMetrics.isFlipped);
-
-    if (prize.image_url) {
-      const image = document.createElement("img");
-      image.src = prize.image_url;
-      image.alt = "";
-      label.append(image);
-    }
 
     const name = document.createElement("span");
     name.className = "wheel-label-text";
@@ -252,6 +263,29 @@ function getWheelLabelFontSize(lines, prizeCount, trackWidth) {
   }
 
   return Math.max(minimumSize, Math.min(preferredSize, maximumSize, maxByTrack));
+}
+
+function getWheelImageMetrics(prizeCount, angle, layout) {
+  const wheelRadius = layout.wheelRadius;
+  const crowded = prizeCount >= 9;
+  const imageSize = Math.round(
+    clamp(wheelRadius * (crowded ? 0.34 : 0.36), crowded ? 60 : 64, crowded ? 78 : 90)
+  );
+  const maximumOffset = Math.max(wheelRadius * 0.45, wheelRadius - imageSize * 0.62 - 10);
+  const centerOffset = Math.round(
+    Math.min(Math.max(wheelRadius * (crowded ? 0.55 : 0.58), wheelRadius * 0.45), maximumOffset)
+  );
+  const radians = (angle * Math.PI) / 180;
+
+  return {
+    size: imageSize,
+    x: Math.round(wheelRadius + Math.cos(radians) * centerOffset),
+    y: Math.round(wheelRadius + Math.sin(radians) * centerOffset)
+  };
+}
+
+function clamp(value, minimum, maximum) {
+  return Math.min(Math.max(value, minimum), maximum);
 }
 
 function spinToPrize(prize, updatedCampaign) {

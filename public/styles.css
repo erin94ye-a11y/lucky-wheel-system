@@ -538,6 +538,35 @@ button.danger:hover {
   z-index: 3;
 }
 
+.wheel-prize-image {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.94);
+  border: 3px solid rgba(255, 255, 255, 0.88);
+  border-radius: 14px;
+  box-shadow: 0 8px 18px rgba(1, 7, 18, 0.22);
+  display: flex;
+  height: var(--wheel-image-size);
+  justify-content: center;
+  overflow: hidden;
+  pointer-events: none;
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: var(--wheel-image-size);
+  z-index: 1;
+}
+
+.wheel-prize-image img {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.wheel.is-crowded .wheel-prize-image {
+  border-radius: 12px;
+  border-width: 2px;
+}
+
 .wheel-label {
   align-items: center;
   color: #fff;
@@ -583,30 +612,6 @@ button.danger:hover {
   text-overflow: clip;
   white-space: nowrap;
   word-break: keep-all;
-}
-
-.wheel.is-dense .wheel-label {
-  gap: 4px;
-}
-
-.wheel.is-crowded .wheel-label {
-  gap: 3px;
-}
-
-.wheel.is-crowded .wheel-label img {
-  display: block;
-  height: 26px;
-  padding: 2px;
-  width: 26px;
-}
-
-.wheel-label img {
-  background: rgba(255, 255, 255, 0.88);
-  border-radius: 8px;
-  height: 44px;
-  object-fit: cover;
-  padding: 4px;
-  width: 44px;
 }
 
 .spin-button {

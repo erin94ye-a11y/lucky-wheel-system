@@ -89,9 +89,12 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
   assert.match(script.body, /getWheelLabelLines/);
   assert.match(script.body, /getWheelLayout/);
   assert.match(script.body, /getWheelLabelMetrics/);
+  assert.match(script.body, /getWheelImageMetrics/);
+  assert.match(script.body, /wheel-prize-image/);
   assert.match(script.body, /getSpinRotation/);
   assert.match(script.body, /--label-rotation/);
   assert.match(script.body, /--label-track-width/);
+  assert.doesNotMatch(script.body, /label\.append\(image\)/);
   assert.doesNotMatch(script.body, /getWheelSegments/);
   assert.doesNotMatch(script.body, /getPrizeWeight/);
   assert.match(script.body, /const slice = 360 \/ prizes\.length/);
@@ -106,8 +109,11 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
   assert.match(styles.body, /--label-text-rotation/);
   assert.match(styles.body, /width:\s*var\(--label-width\)/);
   assert.match(styles.body, /\.wheel-label-line/);
-  assert.doesNotMatch(styles.body, /\.wheel\.is-crowded \.wheel-label img\s*{[^}]*display:\s*none/s);
-  assert.match(styles.body, /\.wheel\.is-crowded \.wheel-label img\s*{[^}]*height:\s*26px/s);
+  assert.match(styles.body, /\.wheel-prize-image\s*{[^}]*height:\s*var\(--wheel-image-size\)/s);
+  assert.match(styles.body, /\.wheel-prize-image\s*{[^}]*width:\s*var\(--wheel-image-size\)/s);
+  assert.match(styles.body, /\.wheel-prize-image img\s*{[^}]*height:\s*100%/s);
+  assert.match(styles.body, /\.wheel-prize-image img\s*{[^}]*object-fit:\s*cover/s);
+  assert.doesNotMatch(styles.body, /\.wheel\.is-crowded \.wheel-label img/);
   assert.match(styles.body, /\.public-page \.topbar\s*{[^}]*flex-direction:\s*column/s);
   assert.match(styles.body, /\.public-page \.topbar\s*{[^}]*align-items:\s*flex-start/s);
   assert.match(styles.body, /\.event-title\s*{[^}]*text-align:\s*left/s);
@@ -315,14 +321,25 @@ test("admin upload creates wheel-sized images and public APIs normalize upload U
     body: JSON.stringify({ username: "admin", password: "admin" })
   });
 
-  const sourceImage = await sharp({
+  const prizeSubject = await sharp({
     create: {
-      width: 240,
-      height: 120,
+      width: 80,
+      height: 80,
       channels: 4,
       background: { r: 226, g: 61, b: 87, alpha: 1 }
     }
   })
+    .png()
+    .toBuffer();
+  const sourceImage = await sharp({
+    create: {
+      width: 300,
+      height: 300,
+      channels: 4,
+      background: { r: 255, g: 255, b: 255, alpha: 1 }
+    }
+  })
+    .composite([{ input: prizeSubject, left: 110, top: 110 }])
     .png()
     .toBuffer();
   const formData = new FormData();
@@ -338,10 +355,19 @@ test("admin upload creates wheel-sized images and public APIs normalize upload U
   const uploadedAsset = await fetch(`${server.baseUrl}${upload.body.image_url}`);
   assert.equal(uploadedAsset.status, 200);
   assert.equal(uploadedAsset.headers.get("content-type"), "image/webp");
-  const assetMetadata = await sharp(Buffer.from(await uploadedAsset.arrayBuffer())).metadata();
-  assert.equal(assetMetadata.width, 96);
-  assert.equal(assetMetadata.height, 96);
+  const assetBuffer = Buffer.from(await uploadedAsset.arrayBuffer());
+  const assetMetadata = await sharp(assetBuffer).metadata();
+  assert.equal(assetMetadata.width, 192);
+  assert.equal(assetMetadata.height, 192);
   assert.equal(assetMetadata.format, "webp");
+  const edgePixels = await sharp(assetBuffer)
+    .ensureAlpha()
+    .extract({ left: 0, top: 0, width: 1, height: 1 })
+    .raw()
+    .toBuffer();
+  assert.ok(edgePixels[0] > 180);
+  assert.ok(edgePixels[1] < 120);
+  assert.ok(edgePixels[2] < 140);
 
   const savedPrizes = await server.request("/api/admin/prizes", {
     method: "PUT",
