@@ -98,7 +98,7 @@ input:focus {
 
 .brand-lockup {
   display: grid;
-  gap: clamp(14px, 3.6vw, 26px);
+  gap: clamp(8px, 2.4vw, 18px);
   width: min(100%, 860px);
 }
 
@@ -661,6 +661,7 @@ button.danger:hover {
 }
 
 body.public-page {
+  --topbar-offset: clamp(146px, 39vw, 286px);
   background:
     radial-gradient(circle at 84% 16%, rgba(255, 199, 0, 0.15), transparent 23%),
     radial-gradient(circle at 16% 42%, rgba(0, 229, 255, 0.08), transparent 30%),
@@ -669,12 +670,13 @@ body.public-page {
     #050b16;
   background-size: auto, auto, 72px 72px, 72px 72px, auto;
   color: #f8fbff;
+  padding-top: var(--topbar-offset);
 }
 
 .public-page .topbar {
-  --brand-jump-size: clamp(38px, 13vw, 92px);
-  --brand-quantum-size: clamp(21px, 7.15vw, 51px);
-  --event-title-size: clamp(25px, 8.45vw, 60px);
+  --brand-jump-size: clamp(30px, 9.6vw, 64px);
+  --brand-quantum-size: clamp(17px, 5.28vw, 35px);
+  --event-title-size: clamp(20px, 6.24vw, 42px);
   align-items: flex-start;
   background:
     radial-gradient(circle at 22% 12%, rgba(255, 45, 85, 0.12), transparent 30%),
@@ -684,11 +686,11 @@ body.public-page {
   gap: 0;
   justify-content: flex-start;
   left: 0;
-  padding: clamp(18px, 5vw, 46px) clamp(18px, 7vw, 88px) clamp(18px, 4vw, 36px);
-  position: sticky;
+  padding: clamp(14px, 3.5vw, 30px) clamp(18px, 7vw, 88px) clamp(14px, 3vw, 28px);
+  position: fixed;
   right: 0;
   top: 0;
-  z-index: 20;
+  z-index: 50;
 }
 
 .event-title {
@@ -1199,7 +1201,7 @@ td {
   }
 
   .public-page .topbar {
-    padding-bottom: 8px;
+    padding-bottom: clamp(14px, 3vw, 24px);
   }
 
   .wheel-stage {
@@ -1239,7 +1241,7 @@ td {
 
   .public-page .topbar {
     gap: 0;
-    padding: 18px 18px 16px;
+    padding: 12px 18px;
   }
 
   .public-page .brand {
