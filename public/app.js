@@ -125,13 +125,13 @@ function renderCampaign(campaign) {
 }
 
 function renderWheel(prizes) {
-  const slice = 360 / prizes.length;
-  const dense = prizes.length >= 7;
-  const crowded = prizes.length >= 9;
-  const gradient = prizes
-    .map((_, index) => {
-      const color = segmentColors[index % segmentColors.length];
-      return `${color} ${index * slice}deg ${(index + 1) * slice}deg`;
+  const segments = getWheelSegments(prizes);
+  const dense = segments.length >= 7;
+  const crowded = segments.length >= 9;
+  const gradient = segments
+    .map((segment) => {
+      const color = segmentColors[segment.index % segmentColors.length];
+      return `${color} ${formatDegrees(segment.start)}deg ${formatDegrees(segment.end)}deg`;
     })
     .join(", ");
 
@@ -141,12 +141,13 @@ function renderWheel(prizes) {
   wheel.innerHTML = "";
 
   const wheelLayout = getWheelLayout();
-  prizes.forEach((prize, index) => {
+  segments.forEach((segment) => {
+    const prize = segment.prize;
     const label = document.createElement("div");
     label.className = "wheel-label";
-    const angle = index * slice + slice / 2 - 90;
-    const nameLines = getWheelLabelLines(prize.name, prizes.length);
-    const labelMetrics = getWheelLabelMetrics(nameLines, prizes.length, angle, wheelLayout);
+    const angle = segment.center - 90;
+    const nameLines = getWheelLabelLines(prize.name, segments.length);
+    const labelMetrics = getWheelLabelMetrics(nameLines, segments.length, angle, wheelLayout);
     label.style.setProperty("--label-x", `${labelMetrics.x}px`);
     label.style.setProperty("--label-y", `${labelMetrics.y}px`);
     label.style.setProperty("--label-width", `${labelMetrics.width}px`);
@@ -170,6 +171,44 @@ function renderWheel(prizes) {
     label.append(name);
     wheel.append(label);
   });
+}
+
+function getWheelSegments(prizes) {
+  const weightedPrizes = prizes.map((prize, index) => ({
+    prize,
+    index,
+    weight: getPrizeWeight(prize)
+  }));
+  const drawablePrizes = weightedPrizes.filter((item) => item.weight > 0);
+  const segmentsSource = drawablePrizes.length
+    ? drawablePrizes
+    : weightedPrizes.map((item) => ({ ...item, weight: 1 }));
+  const totalWeight = segmentsSource.reduce((sum, item) => sum + item.weight, 0);
+  let cursor = 0;
+
+  return segmentsSource.map((item, segmentIndex) => {
+    const size = segmentIndex === segmentsSource.length - 1
+      ? 360 - cursor
+      : (item.weight / totalWeight) * 360;
+    const segment = {
+      ...item,
+      start: cursor,
+      end: cursor + size,
+      center: cursor + size / 2,
+      size
+    };
+    cursor += size;
+    return segment;
+  });
+}
+
+function getPrizeWeight(prize) {
+  const probability = Number(prize.probability ?? 1);
+  return Number.isFinite(probability) && probability > 0 ? probability : 0;
+}
+
+function formatDegrees(value) {
+  return Number(value.toFixed(4));
 }
 
 function getWheelLayout() {
@@ -284,15 +323,7 @@ function getWheelLabelFontSize(lines, prizeCount) {
 
 function spinToPrize(prize, updatedCampaign) {
   const prizes = activeCampaign.prizes;
-  const selectedIndex = Math.max(
-    0,
-    prizes.findIndex((item) => item.id === prize.id || item.name === prize.name)
-  );
-  const slice = 360 / prizes.length;
-  const targetCenter = selectedIndex * slice + slice / 2 - 90;
-  const normalizedTarget = ((targetCenter % 360) + 360) % 360;
-  const normalizedRotation = currentRotation % 360;
-  const targetRotation = currentRotation + 2160 + (360 - normalizedTarget) - normalizedRotation;
+  const targetRotation = getSpinRotation(prizes, prize, currentRotation);
 
   currentRotation = targetRotation;
   wheel.style.transform = `rotate(${currentRotation}deg)`;
@@ -313,6 +344,20 @@ function spinToPrize(prize, updatedCampaign) {
   }, 4200);
 }
 
+function getSpinRotation(prizes, prize, rotation) {
+  const segments = getWheelSegments(prizes);
+  const selectedSegment =
+    segments.find((segment) => segment.prize.id === prize.id || segment.prize.name === prize.name) ?? segments[0];
+  const desiredRotation = normalizeDegrees(-selectedSegment.center);
+  const normalizedRotation = normalizeDegrees(rotation);
+  const delta = normalizeDegrees(desiredRotation - normalizedRotation);
+  return rotation + 2160 + delta;
+}
+
+function normalizeDegrees(value) {
+  return ((value % 360) + 360) % 360;
+}
+
 function setMessage(text, type) {
   message.textContent = text;
   message.className = `form-message ${type || ""}`.trim();
@@ -320,15 +365,15 @@ function setMessage(text, type) {
 
 function defaultPrizePool() {
   return [
-    { name: "Grand Prize", image_url: "", available: null },
-    { name: "$100 Gift Card", image_url: "", available: null },
-    { name: "Bluetooth Speaker", image_url: "", available: null },
-    { name: "Coffee Voucher", image_url: "", available: null },
-    { name: "VIP Upgrade", image_url: "", available: null },
-    { name: "Movie Tickets", image_url: "", available: null },
-    { name: "Merch Bundle", image_url: "", available: null },
-    { name: "Bonus Entry", image_url: "", available: null },
-    { name: "Try Again", image_url: "", available: null }
+    { name: "Grand Prize", image_url: "", probability: 1, available: null },
+    { name: "$100 Gift Card", image_url: "", probability: 1, available: null },
+    { name: "Bluetooth Speaker", image_url: "", probability: 1, available: null },
+    { name: "Coffee Voucher", image_url: "", probability: 1, available: null },
+    { name: "VIP Upgrade", image_url: "", probability: 1, available: null },
+    { name: "Movie Tickets", image_url: "", probability: 1, available: null },
+    { name: "Merch Bundle", image_url: "", probability: 1, available: null },
+    { name: "Bonus Entry", image_url: "", probability: 1, available: null },
+    { name: "Try Again", image_url: "", probability: 1, available: null }
   ];
 }
 

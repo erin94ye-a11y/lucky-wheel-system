@@ -242,6 +242,7 @@ function toPublicPrizes(prizes) {
     id: prize.id,
     name: prize.name,
     image_url: prize.image_url,
+    probability: Number(prize.probability),
     available: prize.stock === null ? null : Math.max(0, prize.stock - prize.won_count)
   }));
 }

@@ -80,6 +80,10 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
   assert.match(script.body, /getWheelLabelLines/);
   assert.match(script.body, /getWheelLayout/);
   assert.match(script.body, /rectIntersects/);
+  assert.match(script.body, /getWheelSegments/);
+  assert.match(script.body, /getPrizeWeight/);
+  assert.match(script.body, /getSpinRotation/);
+  assert.doesNotMatch(script.body, /const slice = 360 \/ prizes\.length/);
 
   const styles = await server.request("/styles.css", {
     headers: { accept: "text/css" }
@@ -243,11 +247,16 @@ test("admin manages one global prize pool and bulk-generates reusable codes", as
     publicView.body.prizes.map((prize) => prize.name),
     ["Grand Prize", "Gift Card"]
   );
+  assert.deepEqual(
+    publicView.body.prizes.map((prize) => prize.probability),
+    [25, 75]
+  );
 
   const prizePreview = await server.request("/api/public/prizes");
   assert.equal(prizePreview.status, 200);
   assert.equal(prizePreview.body.prizes.length, 2);
-  assert.equal(prizePreview.body.prizes[0].probability, undefined);
+  assert.equal(prizePreview.body.prizes[0].probability, 25);
+  assert.equal(prizePreview.body.prizes[1].probability, 75);
 
   const draw = await server.request("/api/public/draw", {
     method: "POST",
@@ -291,7 +300,7 @@ test("admin creates a campaign and public users can draw with IP logging", async
   assert.equal(publicView.status, 200);
   assert.equal(publicView.body.campaign.title, undefined);
   assert.equal(publicView.body.prizes[0].name, "Phone");
-  assert.equal(publicView.body.prizes[0].probability, undefined);
+  assert.equal(publicView.body.prizes[0].probability, 100);
 
   const draw = await server.request("/api/public/draw", {
     method: "POST",
