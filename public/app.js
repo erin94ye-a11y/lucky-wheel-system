@@ -140,11 +140,13 @@ function renderWheel(prizes) {
   wheel.classList.toggle("is-crowded", crowded);
   wheel.innerHTML = "";
 
+  const wheelLayout = getWheelLayout();
   prizes.forEach((prize, index) => {
     const label = document.createElement("div");
     label.className = "wheel-label";
     const angle = index * slice + slice / 2 - 90;
-    const labelMetrics = getWheelLabelMetrics(prize.name, prizes.length, angle);
+    const nameLines = getWheelLabelLines(prize.name, prizes.length);
+    const labelMetrics = getWheelLabelMetrics(nameLines, prizes.length, angle, wheelLayout);
     label.style.setProperty("--label-x", `${labelMetrics.x}px`);
     label.style.setProperty("--label-y", `${labelMetrics.y}px`);
     label.style.setProperty("--label-width", `${labelMetrics.width}px`);
@@ -158,36 +160,82 @@ function renderWheel(prizes) {
     }
 
     const name = document.createElement("span");
-    name.textContent = prize.name;
+    name.className = "wheel-label-text";
+    for (const line of nameLines) {
+      const lineNode = document.createElement("span");
+      lineNode.className = "wheel-label-line";
+      lineNode.textContent = line;
+      name.append(lineNode);
+    }
     label.append(name);
     wheel.append(label);
   });
 }
 
-function getWheelLabelMetrics(name, prizeCount, angle) {
-  const wheelSize = wheel.offsetWidth || wheel.clientWidth || 320;
+function getWheelLayout() {
+  const wheelRect = wheel.getBoundingClientRect();
+  const buttonRect = spinButton.getBoundingClientRect();
+  const wheelSize = wheelRect.width || wheel.offsetWidth || wheel.clientWidth || 320;
   const wheelRadius = wheelSize / 2;
-  const buttonRadius = (spinButton.offsetWidth || wheelSize * 0.28) / 2;
+  const wheelCenterX = wheelRect.left + wheelRadius;
+  const wheelCenterY = wheelRect.top + wheelRadius;
+
+  return {
+    wheelRadius,
+    button: {
+      left: buttonRect.left - wheelCenterX,
+      right: buttonRect.right - wheelCenterX,
+      top: buttonRect.top - wheelCenterY,
+      bottom: buttonRect.bottom - wheelCenterY
+    }
+  };
+}
+
+function getWheelLabelLines(name, prizeCount) {
+  const label = String(name || "").trim() || "Prize";
+  const words = label.split(/\s+/).filter(Boolean);
+  if (prizeCount < 7 || words.length <= 1) {
+    return [label];
+  }
+
+  if (prizeCount >= 9) {
+    return words.length <= 3 ? words : [words.slice(0, 2).join(" "), words.slice(2).join(" ")];
+  }
+
+  return words.length <= 2 ? words : [words.slice(0, -1).join(" "), words.at(-1)];
+}
+
+function getWheelLabelMetrics(lines, prizeCount, angle, layout) {
+  const wheelRadius = layout.wheelRadius;
   const crowded = prizeCount >= 9;
   const dense = prizeCount >= 7;
-  const fontSize = getWheelLabelFontSize(name, prizeCount);
+  const fontSize = getWheelLabelFontSize(lines, prizeCount);
+  const longestLine = Math.max(...lines.map((line) => line.length));
   const width = Math.round(
-    crowded
-      ? Math.min(86, Math.max(72, wheelRadius * 0.46))
-      : Math.min(dense ? 118 : 140, Math.max(72, wheelRadius * 0.62))
+    Math.min(
+      crowded ? 76 : dense ? 102 : 130,
+      Math.max(crowded ? 48 : 64, longestLine * fontSize * 0.66 + 10)
+    )
   );
-  const lineEstimate = Math.max(1, Math.ceil(String(name || "").length / Math.max(6, width / (fontSize * 0.58))));
-  const labelHeight = Math.min(3, lineEstimate) * fontSize * 1.08;
-  const margin = crowded ? 4 : dense ? 20 : 24;
+  const labelHeight = lines.length * fontSize * 1.04 + Math.max(0, lines.length - 1) * 1;
+  const margin = crowded ? 10 : dense ? 18 : 24;
   const radians = (angle * Math.PI) / 180;
   const cos = Math.cos(radians);
   const sin = Math.sin(radians);
   const maximumXDistance = Math.abs(cos) > 0.04 ? (wheelRadius - width / 2 - margin) / Math.abs(cos) : Number.POSITIVE_INFINITY;
   const maximumYDistance = Math.abs(sin) > 0.04 ? (wheelRadius - labelHeight / 2 - margin) / Math.abs(sin) : Number.POSITIVE_INFINITY;
-  const minimumDistance = buttonRadius + labelHeight / 2 + (crowded ? 16 : 18);
-  const preferredDistance = wheelRadius * (crowded ? 0.78 : dense ? 0.54 : 0.5);
+  const minimumDistance = wheelRadius * (crowded ? 0.46 : dense ? 0.42 : 0.36);
+  const preferredDistance = wheelRadius * (crowded ? 0.66 : dense ? 0.54 : 0.5);
   const maximumDistance = Math.max(minimumDistance, Math.min(maximumXDistance, maximumYDistance));
-  const distance = Math.min(Math.max(preferredDistance, minimumDistance), maximumDistance);
+  let distance = Math.min(Math.max(preferredDistance, minimumDistance), maximumDistance);
+
+  for (let attempt = 0; attempt < 32; attempt += 1) {
+    const rect = getLabelRect(cos, sin, distance, width, labelHeight);
+    if (!rectIntersects(rect, expandRect(layout.button, crowded ? 8 : 10))) {
+      break;
+    }
+    distance = Math.min(maximumDistance, distance + 3);
+  }
 
   return {
     fontSize,
@@ -197,10 +245,34 @@ function getWheelLabelMetrics(name, prizeCount, angle) {
   };
 }
 
-function getWheelLabelFontSize(name, prizeCount) {
-  const length = String(name || "").length;
+function getLabelRect(cos, sin, distance, width, height) {
+  const x = cos * distance;
+  const y = sin * distance;
+  return {
+    left: x - width / 2,
+    right: x + width / 2,
+    top: y - height / 2,
+    bottom: y + height / 2
+  };
+}
+
+function expandRect(rect, padding) {
+  return {
+    left: rect.left - padding,
+    right: rect.right + padding,
+    top: rect.top - padding,
+    bottom: rect.bottom + padding
+  };
+}
+
+function rectIntersects(first, second) {
+  return !(first.right <= second.left || first.left >= second.right || first.bottom <= second.top || first.top >= second.bottom);
+}
+
+function getWheelLabelFontSize(lines, prizeCount) {
+  const length = lines.join("").length;
   if (prizeCount >= 9) {
-    return length > 14 ? 12 : 14;
+    return length > 14 ? 12 : 13;
   }
 
   if (prizeCount >= 7) {
