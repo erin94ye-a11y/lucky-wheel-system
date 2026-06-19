@@ -73,6 +73,7 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
   assert.match(page.body, /INVESTOR REWARDS EVENT/);
   assert.match(page.body, /brand-jump/);
   assert.match(page.body, /brand-quantum/);
+  assert.match(page.body, /brand-divider/);
   assert.doesNotMatch(page.body, /\/assets\/jump-quantum-logo\.png/);
 
   const script = await server.request("/app.js", {
@@ -108,6 +109,13 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
   assert.match(styles.body, /\.event-title\s*{[^}]*text-align:\s*left/s);
   assert.match(styles.body, /\.brand-jump\s*{[^}]*color:\s*#[a-fA-F0-9]{6}/s);
   assert.match(styles.body, /\.brand-quantum\s*{[^}]*color:\s*#[a-fA-F0-9]{6}/s);
+  assert.match(styles.body, /--brand-jump-size:\s*clamp\(38px,\s*13vw,\s*92px\)/);
+  assert.match(styles.body, /--brand-quantum-size:\s*clamp\(21px,\s*7\.15vw,\s*51px\)/);
+  assert.match(styles.body, /--event-title-size:\s*clamp\(25px,\s*8\.45vw,\s*60px\)/);
+  assert.match(styles.body, /\.brand-name\s*{[^}]*flex-direction:\s*column/s);
+  assert.match(styles.body, /\.brand-quantum\s*{[^}]*font-size:\s*var\(--brand-quantum-size\)/s);
+  assert.match(styles.body, /\.brand-divider\s*{[^}]*linear-gradient\(90deg,\s*#ff2d55,\s*#ffd35a\)/s);
+  assert.match(styles.body, /\.event-title\s*{[^}]*font-size:\s*var\(--event-title-size\)/s);
 
   const fallbackPrizeNames = [
     "Grand Prize",
@@ -137,6 +145,7 @@ test("public page keeps the code entry flow and removes the unused reward intro"
   assert.equal(page.status, 200);
   assert.match(page.body, /JUMP QUANTUM™/);
   assert.match(page.body, /INVESTOR REWARDS EVENT/);
+  assert.match(page.body, /brand-divider/);
   assert.match(page.body, /Enter your code/);
   assert.match(page.body, /Prize Wheel/);
   assert.doesNotMatch(page.body, /reward-kicker/);

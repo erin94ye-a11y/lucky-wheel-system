@@ -96,29 +96,43 @@ input:focus {
   gap: 10px;
 }
 
+.brand-lockup {
+  display: grid;
+  gap: clamp(14px, 3.6vw, 26px);
+  width: min(100%, 860px);
+}
+
 .brand-name {
-  align-items: baseline;
+  align-items: flex-start;
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  line-height: 0.92;
+  flex-direction: column;
+  gap: clamp(3px, 1.3vw, 10px);
+  line-height: 0.86;
   text-transform: uppercase;
 }
 
 .brand-jump {
   color: #ff2d55;
-  font-size: clamp(34px, 11vw, 48px);
+  font-size: var(--brand-jump-size);
   font-weight: 950;
   letter-spacing: 0;
-  text-shadow: 0 0 18px rgba(255, 45, 85, 0.22);
+  text-shadow: 0 0 24px rgba(255, 45, 85, 0.3);
 }
 
 .brand-quantum {
-  color: #f8fbff;
-  font-size: clamp(13px, 4vw, 17px);
+  color: #f9fbff;
+  font-size: var(--brand-quantum-size);
   font-weight: 950;
   letter-spacing: 0;
-  text-shadow: 0 0 14px rgba(248, 251, 255, 0.16);
+  text-shadow: 0 0 18px rgba(248, 251, 255, 0.22);
+}
+
+.brand-divider {
+  background: linear-gradient(90deg, #ff2d55, #ffd35a);
+  border-radius: 999px;
+  display: block;
+  height: clamp(2px, 0.5vw, 4px);
+  width: min(100%, 760px);
 }
 
 .brand-mark {
@@ -658,14 +672,19 @@ body.public-page {
 }
 
 .public-page .topbar {
+  --brand-jump-size: clamp(38px, 13vw, 92px);
+  --brand-quantum-size: clamp(21px, 7.15vw, 51px);
+  --event-title-size: clamp(25px, 8.45vw, 60px);
   align-items: flex-start;
-  background: rgba(5, 11, 22, 0.86);
+  background:
+    radial-gradient(circle at 22% 12%, rgba(255, 45, 85, 0.12), transparent 30%),
+    linear-gradient(180deg, rgba(4, 10, 23, 0.98), rgba(7, 14, 28, 0.92));
   border-bottom: 1px solid rgba(86, 112, 151, 0.24);
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
   justify-content: flex-start;
   left: 0;
-  padding: 18px clamp(18px, 5vw, 44px) 12px;
+  padding: clamp(18px, 5vw, 46px) clamp(18px, 7vw, 88px) clamp(18px, 4vw, 36px);
   position: sticky;
   right: 0;
   top: 0;
@@ -673,13 +692,15 @@ body.public-page {
 }
 
 .event-title {
-  color: #ffd23f;
-  font-size: clamp(12px, 3.6vw, 15px);
-  font-weight: 900;
+  color: #ffd35a;
+  display: grid;
+  font-size: var(--event-title-size);
+  font-weight: 950;
   letter-spacing: 0;
-  line-height: 1.2;
+  line-height: 0.96;
   margin: 0;
   text-align: left;
+  text-shadow: 0 0 24px rgba(255, 211, 90, 0.2);
 }
 
 .brand-word {
@@ -1217,28 +1238,20 @@ td {
   }
 
   .public-page .topbar {
-    gap: 10px;
-    padding: 14px 14px 10px;
+    gap: 0;
+    padding: 18px 18px 16px;
   }
 
   .public-page .brand {
     min-width: 0;
   }
 
+  .brand-lockup {
+    width: 100%;
+  }
+
   .brand-name {
-    gap: 6px;
-  }
-
-  .brand-jump {
-    font-size: 39px;
-  }
-
-  .brand-quantum {
-    font-size: 13px;
-  }
-
-  .event-title {
-    font-size: 12px;
+    gap: 4px;
   }
 
   .topbar-cta {
