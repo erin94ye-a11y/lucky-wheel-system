@@ -1,10 +1,11 @@
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { dirname, extname, join } from "node:path";
+import { dirname, join } from "node:path";
 import { mkdirSync } from "node:fs";
 
 import express from "express";
 import multer from "multer";
+import sharp from "sharp";
 
 import {
   bulkGenerateCampaignCodes,
@@ -28,6 +29,7 @@ const __dirname = dirname(__filename);
 const projectRoot = join(__dirname, "..");
 
 const COOKIE_NAME = "lucky_admin";
+const PRIZE_IMAGE_SIZE = 96;
 
 export function createApp(options = {}) {
   const app = express();
@@ -48,14 +50,7 @@ export function createApp(options = {}) {
   mkdirSync(uploadDir, { recursive: true });
   const db = openDatabase(databasePath);
   const upload = multer({
-    storage: multer.diskStorage({
-      destination: uploadDir,
-      filename: (_request, file, callback) => {
-        const extension = extname(file.originalname).toLowerCase() || ".png";
-        const safeName = `${Date.now()}-${crypto.randomBytes(6).toString("hex")}${extension}`;
-        callback(null, safeName);
-      }
-    }),
+    storage: multer.memoryStorage(),
     fileFilter: (_request, file, callback) => {
       if (!file.mimetype.startsWith("image/")) {
         callback(new Error("Only image files can be uploaded."));
@@ -177,8 +172,12 @@ export function createApp(options = {}) {
       "/api/admin/upload",
       requireAdmin(sessionSecret),
       upload.single("image"),
-      (request, response) => {
-        response.json({ image_url: `/uploads/${request.file.filename}` });
+      async (request, response, next) => {
+        try {
+          response.json({ image_url: await savePrizeImage(request.file, uploadDir) });
+        } catch (error) {
+          next(error);
+        }
       }
     );
 
@@ -194,7 +193,7 @@ export function createApp(options = {}) {
 
     app.get("/api/public/campaigns/:code", (request, response, next) => {
       try {
-        const campaign = publicCampaign(getCampaignByCode(db, request.params.code));
+        const campaign = toPublicCampaign(getCampaignByCode(db, request.params.code));
         response.json({ campaign, prizes: campaign.prizes });
       } catch (error) {
         next(error);
@@ -213,13 +212,13 @@ export function createApp(options = {}) {
           prize: {
             id: result.prize.id,
             name: result.prize.name,
-            image_url: result.prize.image_url
+            image_url: publicUploadUrl(result.prize.image_url)
           },
           draw: {
             id: result.draw.id,
             created_at: result.draw.created_at
           },
-          campaign: publicCampaign(result.campaign, { validate: false })
+          campaign: toPublicCampaign(result.campaign, { validate: false })
         });
       } catch (error) {
         next(error);
@@ -237,13 +236,76 @@ export function createApp(options = {}) {
   return app;
 }
 
+async function savePrizeImage(file, uploadDir) {
+  if (!file?.buffer) {
+    const error = new Error("No image file was uploaded.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const safeName = `${Date.now()}-${crypto.randomBytes(6).toString("hex")}.webp`;
+  const outputPath = join(uploadDir, safeName);
+
+  try {
+    await sharp(file.buffer)
+      .rotate()
+      .resize(PRIZE_IMAGE_SIZE, PRIZE_IMAGE_SIZE, {
+        fit: "cover",
+        position: "center"
+      })
+      .webp({ quality: 86 })
+      .toFile(outputPath);
+  } catch {
+    const error = new Error("The uploaded file could not be processed as an image.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return `/uploads/${safeName}`;
+}
+
+function toPublicCampaign(campaign, options = {}) {
+  const view = publicCampaign(campaign, options);
+  return {
+    ...view,
+    prizes: toPublicPrizes(view.prizes ?? [])
+  };
+}
+
 function toPublicPrizes(prizes) {
-  return prizes.map((prize) => ({
+  return prizes.map(toPublicPrize);
+}
+
+function toPublicPrize(prize) {
+  return {
     id: prize.id,
     name: prize.name,
-    image_url: prize.image_url,
-    available: prize.stock === null ? null : Math.max(0, prize.stock - prize.won_count)
-  }));
+    image_url: publicUploadUrl(prize.image_url),
+    available:
+      "available" in prize
+        ? prize.available
+        : prize.stock === null
+          ? null
+          : Math.max(0, prize.stock - prize.won_count)
+  };
+}
+
+function publicUploadUrl(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) {
+    return "";
+  }
+
+  try {
+    const parsed = new URL(raw);
+    if (parsed.pathname.startsWith("/uploads/")) {
+      return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    }
+  } catch {
+    return raw;
+  }
+
+  return raw;
 }
 
 function requireAdmin(secret) {

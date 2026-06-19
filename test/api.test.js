@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
+import sharp from "sharp";
+
 import { createApp } from "../src/server.js";
 
 function startTestServer(options = {}) {
@@ -22,7 +24,7 @@ function startTestServer(options = {}) {
 
   async function request(path, options = {}) {
     const headers = {
-      "content-type": "application/json",
+      ...(options.body instanceof FormData ? {} : { "content-type": "application/json" }),
       ...(cookie ? { cookie } : {}),
       ...(options.headers ?? {})
     };
@@ -41,7 +43,7 @@ function startTestServer(options = {}) {
     return { status: response.status, body };
   }
 
-  return { request, close: () => server.close() };
+  return { request, baseUrl, close: () => server.close() };
 }
 
 test("public mode does not expose admin login page or admin APIs", async (t) => {
@@ -104,6 +106,8 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
   assert.match(styles.body, /--label-text-rotation/);
   assert.match(styles.body, /width:\s*var\(--label-width\)/);
   assert.match(styles.body, /\.wheel-label-line/);
+  assert.doesNotMatch(styles.body, /\.wheel\.is-crowded \.wheel-label img\s*{[^}]*display:\s*none/s);
+  assert.match(styles.body, /\.wheel\.is-crowded \.wheel-label img\s*{[^}]*height:\s*26px/s);
   assert.match(styles.body, /\.public-page \.topbar\s*{[^}]*flex-direction:\s*column/s);
   assert.match(styles.body, /\.public-page \.topbar\s*{[^}]*align-items:\s*flex-start/s);
   assert.match(styles.body, /\.event-title\s*{[^}]*text-align:\s*left/s);
@@ -295,6 +299,87 @@ test("admin manages one global prize pool and bulk-generates reusable codes", as
   } finally {
     Math.random = originalRandom;
   }
+});
+
+test("admin upload creates wheel-sized images and public APIs normalize upload URLs", async (t) => {
+  const server = startTestServer({ mode: "all" });
+  t.after(server.close);
+
+  await server.request("/api/admin/login", {
+    method: "POST",
+    body: JSON.stringify({ username: "admin", password: "admin" })
+  });
+
+  const sourceImage = await sharp({
+    create: {
+      width: 240,
+      height: 120,
+      channels: 4,
+      background: { r: 226, g: 61, b: 87, alpha: 1 }
+    }
+  })
+    .png()
+    .toBuffer();
+  const formData = new FormData();
+  formData.append("image", new Blob([sourceImage], { type: "image/png" }), "wide-prize.png");
+
+  const upload = await server.request("/api/admin/upload", {
+    method: "POST",
+    body: formData
+  });
+  assert.equal(upload.status, 200);
+  assert.match(upload.body.image_url, /^\/uploads\/.+\.webp$/);
+
+  const uploadedAsset = await fetch(`${server.baseUrl}${upload.body.image_url}`);
+  assert.equal(uploadedAsset.status, 200);
+  assert.equal(uploadedAsset.headers.get("content-type"), "image/webp");
+  const assetMetadata = await sharp(Buffer.from(await uploadedAsset.arrayBuffer())).metadata();
+  assert.equal(assetMetadata.width, 96);
+  assert.equal(assetMetadata.height, 96);
+  assert.equal(assetMetadata.format, "webp");
+
+  const savedPrizes = await server.request("/api/admin/prizes", {
+    method: "PUT",
+    body: JSON.stringify({
+      prizes: [
+        {
+          name: "Uploaded Prize",
+          probability: 100,
+          stock: null,
+          image_url: `${server.baseUrl.replace(/:\d+$/, ":3001")}${upload.body.image_url}`
+        }
+      ]
+    })
+  });
+  assert.equal(savedPrizes.status, 200);
+
+  const publicPreview = await server.request("/api/public/prizes");
+  assert.equal(publicPreview.status, 200);
+  assert.equal(publicPreview.body.prizes[0].image_url, upload.body.image_url);
+
+  const generated = await server.request("/api/admin/codes/bulk", {
+    method: "POST",
+    body: JSON.stringify({
+      quantity: 1,
+      max_uses: 1,
+      active: true
+    })
+  });
+  assert.equal(generated.status, 201);
+
+  const code = generated.body.campaigns[0].code;
+  const publicCampaign = await server.request(`/api/public/campaigns/${code}`);
+  assert.equal(publicCampaign.status, 200);
+  assert.equal(publicCampaign.body.prizes[0].image_url, upload.body.image_url);
+  assert.equal(publicCampaign.body.prizes[0].available, null);
+
+  const draw = await server.request("/api/public/draw", {
+    method: "POST",
+    body: JSON.stringify({ code })
+  });
+  assert.equal(draw.status, 200);
+  assert.equal(draw.body.prize.image_url, upload.body.image_url);
+  assert.equal(draw.body.campaign.prizes[0].image_url, upload.body.image_url);
 });
 
 test("admin creates a campaign and public users can draw with IP logging", async (t) => {
