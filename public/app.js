@@ -28,11 +28,20 @@ let isSpinning = false;
 
 codeForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  setMessage("Checking your code...", "");
   resultPanel.classList.add("is-hidden");
 
+  const code = codeInput.value.trim().toUpperCase();
+  if (!code) {
+    codeInput.setAttribute("aria-invalid", "true");
+    codeInput.focus();
+    setMessage("Please enter your code.", "error");
+    return;
+  }
+
+  codeInput.removeAttribute("aria-invalid");
+  setMessage("Checking your code...", "");
+
   try {
-    const code = codeInput.value.trim().toUpperCase();
     const response = await fetch(`/api/public/campaigns/${encodeURIComponent(code)}`);
     const data = await response.json();
     if (!response.ok) {

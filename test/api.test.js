@@ -150,6 +150,10 @@ test("public page keeps the code entry flow and removes the unused reward intro"
     headers: { accept: "text/html" }
   });
   assert.equal(page.status, 200);
+  assert.doesNotMatch(page.body, /[\u3400-\u9fff]/);
+  assert.match(page.body, /<form id="codeForm" class="code-form" novalidate>/);
+  const codeFormHtml = page.body.slice(page.body.indexOf('<form id="codeForm"'), page.body.indexOf("</form>"));
+  assert.doesNotMatch(codeFormHtml, /\srequired\b/);
   assert.match(page.body, /JUMP QUANTUM™/);
   assert.match(page.body, /INVESTOR REWARDS EVENT/);
   assert.match(page.body, /brand-divider/);
@@ -168,6 +172,7 @@ test("public page keeps the code entry flow and removes the unused reward intro"
     headers: { accept: "text/javascript" }
   });
   assert.equal(script.status, 200);
+  assert.match(script.body, /Please enter your code\./);
   assert.doesNotMatch(script.body, /renderWinnerFeed/);
   assert.doesNotMatch(script.body, /winner-code/);
   assert.doesNotMatch(script.body, /winner-prize/);
