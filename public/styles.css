@@ -96,6 +96,16 @@ input:focus {
   gap: 10px;
 }
 
+.brand-logo {
+  background: #fff;
+  border-radius: 8px;
+  display: block;
+  height: clamp(42px, 8vw, 58px);
+  max-width: min(54vw, 210px);
+  object-fit: contain;
+  width: auto;
+}
+
 .brand-mark {
   align-items: center;
   background: var(--ink);
@@ -635,13 +645,24 @@ body.public-page {
 .public-page .topbar {
   background: rgba(5, 11, 22, 0.86);
   border-bottom: 1px solid rgba(86, 112, 151, 0.24);
-  justify-content: flex-start;
+  gap: 16px;
+  justify-content: space-between;
   left: 0;
   padding: 22px clamp(18px, 5vw, 44px);
   position: sticky;
   right: 0;
   top: 0;
   z-index: 20;
+}
+
+.event-title {
+  color: #ffc400;
+  font-size: clamp(12px, 3.4vw, 15px);
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1.2;
+  margin: 0;
+  text-align: right;
 }
 
 .brand-word {
@@ -1179,6 +1200,8 @@ td {
   }
 
   .public-page .topbar {
+    align-items: flex-start;
+    flex-direction: column;
     gap: 10px;
     padding: 14px 14px 10px;
   }
@@ -1187,10 +1210,14 @@ td {
     min-width: 0;
   }
 
-  .brand-word {
-    font-size: 23px;
-    line-height: 1;
-    white-space: nowrap;
+  .brand-logo {
+    height: 46px;
+    max-width: min(86vw, 220px);
+  }
+
+  .event-title {
+    font-size: 12px;
+    text-align: left;
   }
 
   .topbar-cta {

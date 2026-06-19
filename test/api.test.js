@@ -68,6 +68,10 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
   assert.doesNotMatch(page.body, /参与抽奖会记录服务器可见 IP/);
   assert.doesNotMatch(page.body, /[\u3400-\u9fff]/);
   assert.doesNotMatch(page.body, /topbar-cta/);
+  assert.doesNotMatch(page.body, /CryptoReward/);
+  assert.match(page.body, /Jump Quantum/);
+  assert.match(page.body, /INVESTOR REWARDS EVENT/);
+  assert.match(page.body, /\/assets\/jump-quantum-logo\.png/);
 
   const script = await server.request("/app.js", {
     headers: { accept: "text/javascript" }
@@ -124,7 +128,8 @@ test("public page keeps the code entry flow and removes the unused reward intro"
     headers: { accept: "text/html" }
   });
   assert.equal(page.status, 200);
-  assert.match(page.body, /CryptoReward/);
+  assert.match(page.body, /Jump Quantum/);
+  assert.match(page.body, /INVESTOR REWARDS EVENT/);
   assert.match(page.body, /Enter your code/);
   assert.match(page.body, /Prize Wheel/);
   assert.doesNotMatch(page.body, /reward-kicker/);
