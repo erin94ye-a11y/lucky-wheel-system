@@ -98,7 +98,7 @@ input:focus {
 
 .brand-lockup {
   display: grid;
-  gap: clamp(8px, 2.4vw, 18px);
+  gap: clamp(6px, 1.9vw, 14px);
   width: min(100%, 860px);
 }
 
@@ -106,7 +106,7 @@ input:focus {
   align-items: flex-start;
   display: flex;
   flex-direction: column;
-  gap: clamp(3px, 1.3vw, 10px);
+  gap: clamp(2px, 1vw, 8px);
   line-height: 0.86;
   text-transform: uppercase;
 }
@@ -661,7 +661,7 @@ button.danger:hover {
 }
 
 body.public-page {
-  --topbar-offset: clamp(146px, 39vw, 286px);
+  --topbar-offset: clamp(118px, 31.2vw, 229px);
   background:
     radial-gradient(circle at 84% 16%, rgba(255, 199, 0, 0.15), transparent 23%),
     radial-gradient(circle at 16% 42%, rgba(0, 229, 255, 0.08), transparent 30%),
@@ -674,9 +674,9 @@ body.public-page {
 }
 
 .public-page .topbar {
-  --brand-jump-size: clamp(30px, 9.6vw, 64px);
-  --brand-quantum-size: clamp(17px, 5.28vw, 35px);
-  --event-title-size: clamp(20px, 6.24vw, 42px);
+  --brand-jump-size: clamp(24px, 7.68vw, 51px);
+  --brand-quantum-size: clamp(14px, 4.22vw, 28px);
+  --event-title-size: clamp(16px, 4.99vw, 34px);
   align-items: flex-start;
   background:
     radial-gradient(circle at 22% 12%, rgba(255, 45, 85, 0.12), transparent 30%),
@@ -686,7 +686,7 @@ body.public-page {
   gap: 0;
   justify-content: flex-start;
   left: 0;
-  padding: clamp(14px, 3.5vw, 30px) clamp(18px, 7vw, 88px) clamp(14px, 3vw, 28px);
+  padding: clamp(11px, 2.8vw, 24px) clamp(18px, 7vw, 88px) clamp(11px, 2.4vw, 22px);
   position: fixed;
   right: 0;
   top: 0;
@@ -1201,7 +1201,7 @@ td {
   }
 
   .public-page .topbar {
-    padding-bottom: clamp(14px, 3vw, 24px);
+    padding-bottom: clamp(11px, 2.4vw, 19px);
   }
 
   .wheel-stage {
@@ -1241,7 +1241,7 @@ td {
 
   .public-page .topbar {
     gap: 0;
-    padding: 12px 18px;
+    padding: 10px 18px;
   }
 
   .public-page .brand {
@@ -1253,7 +1253,7 @@ td {
   }
 
   .brand-name {
-    gap: 4px;
+    gap: 3px;
   }
 
   .topbar-cta {
