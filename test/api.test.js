@@ -71,7 +71,9 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
   assert.doesNotMatch(page.body, /CryptoReward/);
   assert.match(page.body, /JUMP QUANTUM™/);
   assert.match(page.body, /INVESTOR REWARDS EVENT/);
-  assert.match(page.body, /\/assets\/jump-quantum-logo\.png/);
+  assert.match(page.body, /brand-jump/);
+  assert.match(page.body, /brand-quantum/);
+  assert.doesNotMatch(page.body, /\/assets\/jump-quantum-logo\.png/);
 
   const script = await server.request("/app.js", {
     headers: { accept: "text/javascript" }
@@ -104,6 +106,8 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
   assert.match(styles.body, /\.public-page \.topbar\s*{[^}]*flex-direction:\s*column/s);
   assert.match(styles.body, /\.public-page \.topbar\s*{[^}]*align-items:\s*flex-start/s);
   assert.match(styles.body, /\.event-title\s*{[^}]*text-align:\s*left/s);
+  assert.match(styles.body, /\.brand-jump\s*{[^}]*color:\s*#[a-fA-F0-9]{6}/s);
+  assert.match(styles.body, /\.brand-quantum\s*{[^}]*color:\s*#[a-fA-F0-9]{6}/s);
 
   const fallbackPrizeNames = [
     "Grand Prize",

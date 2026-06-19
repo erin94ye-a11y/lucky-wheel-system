@@ -96,14 +96,29 @@ input:focus {
   gap: 10px;
 }
 
-.brand-logo {
-  background: #fff;
-  border-radius: 8px;
-  display: block;
-  height: clamp(50px, 13vw, 58px);
-  max-width: min(86vw, 148px);
-  object-fit: contain;
-  width: auto;
+.brand-name {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  line-height: 0.92;
+  text-transform: uppercase;
+}
+
+.brand-jump {
+  color: #ff2d55;
+  font-size: clamp(34px, 11vw, 48px);
+  font-weight: 950;
+  letter-spacing: 0;
+  text-shadow: 0 0 18px rgba(255, 45, 85, 0.22);
+}
+
+.brand-quantum {
+  color: #f8fbff;
+  font-size: clamp(13px, 4vw, 17px);
+  font-weight: 950;
+  letter-spacing: 0;
+  text-shadow: 0 0 14px rgba(248, 251, 255, 0.16);
 }
 
 .brand-mark {
@@ -658,8 +673,8 @@ body.public-page {
 }
 
 .event-title {
-  color: #ffc400;
-  font-size: clamp(12px, 3.4vw, 15px);
+  color: #ffd23f;
+  font-size: clamp(12px, 3.6vw, 15px);
   font-weight: 900;
   letter-spacing: 0;
   line-height: 1.2;
@@ -1210,9 +1225,16 @@ td {
     min-width: 0;
   }
 
-  .brand-logo {
-    height: 56px;
-    max-width: min(86vw, 140px);
+  .brand-name {
+    gap: 6px;
+  }
+
+  .brand-jump {
+    font-size: 39px;
+  }
+
+  .brand-quantum {
+    font-size: 13px;
   }
 
   .event-title {
