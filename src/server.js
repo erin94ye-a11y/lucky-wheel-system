@@ -23,6 +23,7 @@ import {
   updateCampaign
 } from "./db.js";
 import { sanitizeCode } from "./lottery.js";
+import { createDrawsWorkbook } from "./xlsx.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -188,6 +189,16 @@ export function createApp(options = {}) {
 
     app.get("/api/admin/draws", requireAdmin(sessionSecret), (_request, response) => {
       response.json({ draws: listDraws(db) });
+    });
+
+    app.get("/api/admin/draws/export", requireAdmin(sessionSecret), (_request, response) => {
+      const workbook = createDrawsWorkbook(listDraws(db, 100000));
+      response.setHeader(
+        "content-type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
+      response.setHeader("content-disposition", 'attachment; filename="draw-records.xlsx"');
+      response.send(workbook);
     });
   }
 

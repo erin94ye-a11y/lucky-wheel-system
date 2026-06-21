@@ -955,10 +955,24 @@ body.public-page {
   margin-bottom: 16px;
 }
 
+.panel-actions {
+  align-items: center;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .panel-title h2,
 .prize-toolbar h3 {
   font-size: 20px;
   margin: 0;
+}
+
+.small-button {
+  font-size: 13px !important;
+  min-height: 34px !important;
+  padding: 0 12px !important;
 }
 
 .campaign-list {

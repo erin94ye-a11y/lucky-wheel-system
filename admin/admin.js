@@ -22,6 +22,7 @@ const addPrizeButton = document.querySelector("#addPrizeButton");
 const resetPrizeButton = document.querySelector("#resetPrizeButton");
 const drawLogRows = document.querySelector("#drawLogRows");
 const logCount = document.querySelector("#logCount");
+const exportDrawsButton = document.querySelector("#exportDrawsButton");
 
 const ADMIN_SYNC_INTERVAL_MS = 5000;
 
@@ -60,6 +61,9 @@ logoutButton.addEventListener("click", async () => {
 });
 
 refreshButton.addEventListener("click", () => refreshAll({ forcePrizes: true }));
+exportDrawsButton.addEventListener("click", () => {
+  window.location.href = "/api/admin/draws/export";
+});
 
 codeGeneratorForm.addEventListener("submit", async (event) => {
   event.preventDefault();

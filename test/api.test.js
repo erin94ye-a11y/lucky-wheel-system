@@ -33,6 +33,13 @@ function startTestServer(options = {}) {
     if (setCookie) {
       cookie = setCookie.split(";")[0];
     }
+    if (options.raw) {
+      return {
+        status: response.status,
+        body: Buffer.from(await response.arrayBuffer()),
+        headers: response.headers
+      };
+    }
     const text = await response.text();
     let body = null;
     try {
@@ -247,6 +254,25 @@ test("admin prize pool UI explains each prize field", async (t) => {
   assert.match(adminPage.body, /概率权重：数值越大越容易中奖，0 表示不会中奖/);
   assert.match(adminPage.body, /库存：留空表示不限量，填 0 表示不可抽中/);
   assert.match(adminPage.body, /图片：可填写图片地址或上传图片，保存后同步到转盘端/);
+});
+
+test("admin draw log UI includes an xlsx export button", async (t) => {
+  const server = startTestServer({ mode: "admin" });
+  t.after(server.close);
+
+  const adminPage = await server.request("/", {
+    headers: { accept: "text/html" }
+  });
+  assert.equal(adminPage.status, 200);
+  assert.match(adminPage.body, /id="exportDrawsButton"/);
+  assert.match(adminPage.body, /导出XLSX/);
+
+  const adminScript = await server.request("/admin.js", {
+    headers: { accept: "text/javascript" }
+  });
+  assert.equal(adminScript.status, 200);
+  assert.match(adminScript.body, /exportDrawsButton/);
+  assert.match(adminScript.body, /\/api\/admin\/draws\/export/);
 });
 
 test("admin default prize examples use investor rewards with blank stock", async (t) => {
@@ -617,6 +643,57 @@ test("admin creates a campaign and public users can draw with IP logging", async
   assert.equal(logs.body.draws[0].code, "TEST2026");
   assert.equal(logs.body.draws[0].prize_name, "Phone");
   assert.equal(logs.body.draws[0].forwarded_for, "203.0.113.10");
+});
+
+test("admin can export draw records as an xlsx spreadsheet", async (t) => {
+  const server = startTestServer();
+  t.after(server.close);
+
+  const denied = await server.request("/api/admin/draws/export", { raw: true });
+  assert.equal(denied.status, 401);
+
+  await server.request("/api/admin/login", {
+    method: "POST",
+    body: JSON.stringify({ username: "admin", password: "admin" })
+  });
+
+  await server.request("/api/admin/campaigns", {
+    method: "POST",
+    body: JSON.stringify({
+      code: "EXPORT26",
+      title: "Export Test",
+      max_uses: 1,
+      active: true,
+      prizes: [{ name: "Phone", probability: 100, stock: 1 }]
+    })
+  });
+
+  const draw = await server.request("/api/public/draw", {
+    method: "POST",
+    headers: {
+      "x-forwarded-for": "198.51.100.24",
+      "user-agent": "Export Test Browser"
+    },
+    body: JSON.stringify({ code: "EXPORT26" })
+  });
+  assert.equal(draw.status, 200);
+
+  const exported = await server.request("/api/admin/draws/export", { raw: true });
+  assert.equal(exported.status, 200);
+  assert.equal(
+    exported.headers.get("content-type"),
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  );
+  assert.match(
+    exported.headers.get("content-disposition"),
+    /attachment; filename="draw-records\.xlsx"/
+  );
+  assert.equal(exported.body.subarray(0, 2).toString("utf8"), "PK");
+  const workbookText = exported.body.toString("utf8");
+  assert.match(workbookText, /EXPORT26/);
+  assert.match(workbookText, /Phone/);
+  assert.match(workbookText, /198\.51\.100\.24/);
+  assert.match(workbookText, /Export Test Browser/);
 });
 
 test("admin can delete a generated lottery code", async (t) => {
