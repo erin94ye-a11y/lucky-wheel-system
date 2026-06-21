@@ -196,6 +196,8 @@ test("admin bulk code UI omits batch title and includes code deletion", async (t
   assert.equal(adminPage.status, 200);
   assert.doesNotMatch(adminPage.body, /批次名称/);
   assert.doesNotMatch(adminPage.body, /codeTitleInput/);
+  assert.match(adminPage.body, /id="quantityInput"[^>]+value="1"/);
+  assert.doesNotMatch(adminPage.body, /id="quantityInput"[^>]+value="20"/);
 
   const adminScript = await server.request("/admin.js", {
     headers: { accept: "text/javascript" }
