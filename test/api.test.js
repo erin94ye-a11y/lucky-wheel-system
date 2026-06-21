@@ -253,6 +253,22 @@ test("admin default prize examples use investor rewards with blank stock", async
   assert.doesNotMatch(defaultPrizeBlock, /stock:\s*[0-9]/);
 });
 
+test("admin prize settings stay synced across logged-in devices", async (t) => {
+  const server = startTestServer({ mode: "admin" });
+  t.after(server.close);
+
+  const adminScript = await server.request("/admin.js", {
+    headers: { accept: "text/javascript" }
+  });
+  assert.equal(adminScript.status, 200);
+  assert.match(adminScript.body, /ADMIN_SYNC_INTERVAL_MS\s*=\s*5000/);
+  assert.match(adminScript.body, /startAdminSync/);
+  assert.match(adminScript.body, /stopAdminSync/);
+  assert.match(adminScript.body, /prizeListSignature/);
+  assert.match(adminScript.body, /!prizeFormDirty/);
+  assert.doesNotMatch(adminScript.body, /prizeResponse\.ok && !prizesLoaded/);
+});
+
 test("admin mode serves the login page separately and hides public APIs", async (t) => {
   const server = startTestServer({ mode: "admin" });
   t.after(server.close);
@@ -354,6 +370,69 @@ test("admin manages one global prize pool and bulk-generates reusable codes", as
     });
     assert.equal(draw.status, 200);
     assert.equal(draw.body.prize.name, "Gift Card");
+  } finally {
+    Math.random = originalRandom;
+  }
+});
+
+test("generated codes draw from the latest global prize probabilities", async (t) => {
+  const server = startTestServer({ mode: "all" });
+  t.after(server.close);
+
+  await server.request("/api/admin/login", {
+    method: "POST",
+    body: JSON.stringify({ username: "admin", password: "admin" })
+  });
+
+  const initialPrizes = await server.request("/api/admin/prizes", {
+    method: "PUT",
+    body: JSON.stringify({
+      prizes: [
+        { name: "Old Probability Prize", probability: 100, stock: null, image_url: "" },
+        { name: "Latest Probability Prize", probability: 0, stock: null, image_url: "" }
+      ]
+    })
+  });
+  assert.equal(initialPrizes.status, 200);
+
+  const generated = await server.request("/api/admin/codes/bulk", {
+    method: "POST",
+    body: JSON.stringify({
+      quantity: 1,
+      max_uses: 1,
+      active: true
+    })
+  });
+  assert.equal(generated.status, 201);
+  const code = generated.body.campaigns[0].code;
+
+  const updatedPrizes = await server.request("/api/admin/prizes", {
+    method: "PUT",
+    body: JSON.stringify({
+      prizes: [
+        { name: "Old Probability Prize", probability: 0, stock: null, image_url: "" },
+        { name: "Latest Probability Prize", probability: 100, stock: null, image_url: "" }
+      ]
+    })
+  });
+  assert.equal(updatedPrizes.status, 200);
+
+  const publicView = await server.request(`/api/public/campaigns/${code}`);
+  assert.equal(publicView.status, 200);
+  assert.deepEqual(
+    publicView.body.prizes.map((prize) => prize.name),
+    ["Old Probability Prize", "Latest Probability Prize"]
+  );
+
+  const originalRandom = Math.random;
+  Math.random = () => 0;
+  try {
+    const draw = await server.request("/api/public/draw", {
+      method: "POST",
+      body: JSON.stringify({ code })
+    });
+    assert.equal(draw.status, 200);
+    assert.equal(draw.body.prize.name, "Latest Probability Prize");
   } finally {
     Math.random = originalRandom;
   }

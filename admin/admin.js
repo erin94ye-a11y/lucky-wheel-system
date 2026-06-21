@@ -23,8 +23,13 @@ const resetPrizeButton = document.querySelector("#resetPrizeButton");
 const drawLogRows = document.querySelector("#drawLogRows");
 const logCount = document.querySelector("#logCount");
 
+const ADMIN_SYNC_INTERVAL_MS = 5000;
+
 let campaigns = [];
 let prizesLoaded = false;
+let adminSyncTimer = null;
+let prizeFormDirty = false;
+let latestPrizeSignature = "";
 
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -49,11 +54,12 @@ loginForm.addEventListener("submit", async (event) => {
 
 logoutButton.addEventListener("click", async () => {
   await api("/api/admin/logout", { method: "POST" });
+  stopAdminSync();
   adminView.classList.add("is-hidden");
   loginView.classList.remove("is-hidden");
 });
 
-refreshButton.addEventListener("click", refreshAll);
+refreshButton.addEventListener("click", () => refreshAll({ forcePrizes: true }));
 
 codeGeneratorForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -76,7 +82,7 @@ codeGeneratorForm.addEventListener("submit", async (event) => {
 
   setState(codeState, `已生成 ${response.campaigns.length} 个代码`, "success");
   renderGeneratedCodes(response.campaigns);
-  await refreshAll();
+  await refreshAll({ forcePrizes: true });
 });
 
 prizeForm.addEventListener("submit", async (event) => {
@@ -99,10 +105,12 @@ prizeForm.addEventListener("submit", async (event) => {
 
 addPrizeButton.addEventListener("click", () => {
   addPrizeRow({ name: "", probability: 10, stock: "", image_url: "" });
+  markPrizeFormDirty();
 });
 
 resetPrizeButton.addEventListener("click", () => {
-  renderPrizeSettings(defaultPrizes());
+  renderPrizeSettings(defaultPrizes(), { fromServer: false });
+  markPrizeFormDirty();
   setState(prizeState, "已恢复默认示例，保存后生效", "muted");
 });
 
@@ -117,9 +125,27 @@ async function boot() {
 function showAdmin() {
   loginView.classList.add("is-hidden");
   adminView.classList.remove("is-hidden");
+  startAdminSync();
 }
 
-async function refreshAll() {
+function startAdminSync() {
+  if (adminSyncTimer) {
+    return;
+  }
+
+  adminSyncTimer = window.setInterval(() => refreshAll({ silent: true }), ADMIN_SYNC_INTERVAL_MS);
+}
+
+function stopAdminSync() {
+  if (!adminSyncTimer) {
+    return;
+  }
+
+  window.clearInterval(adminSyncTimer);
+  adminSyncTimer = null;
+}
+
+async function refreshAll(options = {}) {
   const [campaignResponse, prizeResponse, drawResponse] = await Promise.all([
     api("/api/admin/campaigns"),
     api("/api/admin/prizes"),
@@ -131,9 +157,21 @@ async function refreshAll() {
     renderCampaignList();
   }
 
-  if (prizeResponse.ok && !prizesLoaded) {
-    prizesLoaded = true;
-    renderPrizeSettings(prizeResponse.prizes.length ? prizeResponse.prizes : defaultPrizes());
+  if (prizeResponse.ok) {
+    const serverPrizes = prizeResponse.prizes.length ? prizeResponse.prizes : defaultPrizes();
+    const nextPrizeSignature = prizeListSignature(serverPrizes);
+    const prizesChanged = nextPrizeSignature !== latestPrizeSignature;
+    if (
+      !prizesLoaded ||
+      options.forcePrizes ||
+      (!prizeFormDirty && prizesChanged)
+    ) {
+      renderPrizeSettings(serverPrizes);
+      prizesLoaded = true;
+      if (options.silent && prizesChanged) {
+        setState(prizeState, "已同步最新奖品池", "success");
+      }
+    }
   }
 
   if (drawResponse.ok) {
@@ -203,10 +241,15 @@ async function deleteCampaign(campaign) {
   await refreshAll();
 }
 
-function renderPrizeSettings(prizes) {
+function renderPrizeSettings(prizes, options = {}) {
   prizeRows.innerHTML = "";
   for (const prize of prizes) {
     addPrizeRow(prize);
+  }
+
+  if (options.fromServer !== false) {
+    latestPrizeSignature = prizeListSignature(prizes);
+    prizeFormDirty = false;
   }
 }
 
@@ -219,7 +262,14 @@ function addPrizeRow(prize) {
 
   row.querySelector(".remove-prize").addEventListener("click", () => {
     row.remove();
+    markPrizeFormDirty();
   });
+
+  row
+    .querySelectorAll(".prize-name, .prize-probability, .prize-stock, .prize-image")
+    .forEach((input) => {
+      input.addEventListener("input", markPrizeFormDirty);
+    });
 
   row.querySelector(".prize-upload").addEventListener("change", async (event) => {
     const file = event.currentTarget.files[0];
@@ -235,6 +285,7 @@ function addPrizeRow(prize) {
     const data = await response.json();
     if (response.ok) {
       row.querySelector(".prize-image").value = data.image_url;
+      markPrizeFormDirty();
       setState(prizeState, "图片已上传", "success");
     } else {
       setState(prizeState, data.error || "图片上传失败", "error");
@@ -242,6 +293,10 @@ function addPrizeRow(prize) {
   });
 
   prizeRows.append(row);
+}
+
+function markPrizeFormDirty() {
+  prizeFormDirty = true;
 }
 
 function readPrizeForm() {
@@ -252,6 +307,18 @@ function readPrizeForm() {
     image_url: row.querySelector(".prize-image").value,
     sort_order: index
   }));
+}
+
+function prizeListSignature(prizes) {
+  return JSON.stringify(
+    prizes.map((prize, index) => ({
+      name: String(prize.name ?? ""),
+      probability: Number(prize.probability ?? 0),
+      stock: prize.stock ?? "",
+      image_url: String(prize.image_url ?? ""),
+      sort_order: Number.isInteger(prize.sort_order) ? prize.sort_order : index
+    }))
+  );
 }
 
 function renderDraws(draws) {
