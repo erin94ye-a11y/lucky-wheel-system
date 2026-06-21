@@ -84,6 +84,12 @@
               <h3>奖品、图片、概率与库存</h3>
               <button class="secondary" id="addPrizeButton" type="button">添加奖品</button>
             </div>
+            <div class="prize-guide" aria-label="奖品字段说明">
+              <p>奖品名称：转盘端显示的奖品文字</p>
+              <p>概率权重：数值越大越容易中奖，0 表示不会中奖</p>
+              <p>库存：留空表示不限量，填 0 表示不可抽中</p>
+              <p>图片：可填写图片地址或上传图片，保存后同步到转盘端</p>
+            </div>
             <div class="prize-table" id="prizeRows"></div>
             <div class="submit-row">
               <button type="submit">保存奖品池</button>

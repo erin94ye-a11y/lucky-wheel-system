@@ -208,6 +208,21 @@ test("admin bulk code UI omits batch title and includes code deletion", async (t
   assert.match(adminScript.body, /method: "DELETE"/);
 });
 
+test("admin prize pool UI explains each prize field", async (t) => {
+  const server = startTestServer({ mode: "admin" });
+  t.after(server.close);
+
+  const adminPage = await server.request("/", {
+    headers: { accept: "text/html" }
+  });
+  assert.equal(adminPage.status, 200);
+  assert.match(adminPage.body, /class="prize-guide"/);
+  assert.match(adminPage.body, /奖品名称：转盘端显示的奖品文字/);
+  assert.match(adminPage.body, /概率权重：数值越大越容易中奖，0 表示不会中奖/);
+  assert.match(adminPage.body, /库存：留空表示不限量，填 0 表示不可抽中/);
+  assert.match(adminPage.body, /图片：可填写图片地址或上传图片，保存后同步到转盘端/);
+});
+
 test("admin mode serves the login page separately and hides public APIs", async (t) => {
   const server = startTestServer({ mode: "admin" });
   t.after(server.close);
