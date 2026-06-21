@@ -59,6 +59,32 @@ test("public mode does not expose admin login page or admin APIs", async (t) => 
   assert.equal(adminApi.status, 404);
 });
 
+test("site pages expose the Jump Quantum favicon in public and admin modes", async (t) => {
+  const publicServer = startTestServer({ mode: "public" });
+  t.after(publicServer.close);
+  const adminServer = startTestServer({ mode: "admin" });
+  t.after(adminServer.close);
+
+  const publicPage = await publicServer.request("/", {
+    headers: { accept: "text/html" }
+  });
+  assert.equal(publicPage.status, 200);
+  assert.match(publicPage.body, /<link rel="icon" type="image\/png" href="\/favicon\.png" \/>/);
+  assert.match(publicPage.body, /<link rel="apple-touch-icon" href="\/apple-touch-icon\.png" \/>/);
+
+  const adminPage = await adminServer.request("/", {
+    headers: { accept: "text/html" }
+  });
+  assert.equal(adminPage.status, 200);
+  assert.match(adminPage.body, /<link rel="icon" type="image\/png" href="\/favicon\.png" \/>/);
+  assert.match(adminPage.body, /<link rel="apple-touch-icon" href="\/apple-touch-icon\.png" \/>/);
+
+  const publicIcon = await publicServer.request("/favicon.png");
+  assert.equal(publicIcon.status, 200);
+  const adminIcon = await adminServer.request("/favicon.png");
+  assert.equal(adminIcon.status, 200);
+});
+
 test("public H5 page hides the privacy note and ships nine fallback prize categories", async (t) => {
   const server = startTestServer({ mode: "public" });
   t.after(server.close);

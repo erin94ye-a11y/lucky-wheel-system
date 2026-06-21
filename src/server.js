@@ -69,6 +69,11 @@ export function createApp(options = {}) {
   app.get("/styles.css", (_request, response) => {
     response.sendFile(join(publicDir, "styles.css"));
   });
+  for (const iconFile of ["favicon.png", "favicon-32.png", "favicon.ico", "apple-touch-icon.png"]) {
+    app.get(`/${iconFile}`, (_request, response) => {
+      response.sendFile(join(publicDir, iconFile));
+    });
+  }
 
   if (publicEnabled) {
     app.use(express.static(publicDir));
