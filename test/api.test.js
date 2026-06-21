@@ -223,6 +223,36 @@ test("admin prize pool UI explains each prize field", async (t) => {
   assert.match(adminPage.body, /图片：可填写图片地址或上传图片，保存后同步到转盘端/);
 });
 
+test("admin default prize examples use investor rewards with blank stock", async (t) => {
+  const server = startTestServer({ mode: "admin" });
+  t.after(server.close);
+
+  const adminScript = await server.request("/admin.js", {
+    headers: { accept: "text/javascript" }
+  });
+  assert.equal(adminScript.status, 200);
+  const defaultPrizeBlock = adminScript.body.slice(
+    adminScript.body.indexOf("function defaultPrizes()"),
+    adminScript.body.indexOf("function formatTime")
+  );
+  assert.deepEqual(
+    [
+      "$77 USDT",
+      "#1 Ethereum",
+      "Thanks for playing",
+      "Apple Mac",
+      "iPhone 17 Pro Max",
+      "Thanks for playing",
+      "20 shares of NVDA",
+      "#1 oz gold",
+      "Thanks for playing"
+    ].map((name) => defaultPrizeBlock.includes(`name: "${name}"`)),
+    Array(9).fill(true)
+  );
+  assert.equal((defaultPrizeBlock.match(/stock:\s*""/g) || []).length, 9);
+  assert.doesNotMatch(defaultPrizeBlock, /stock:\s*[0-9]/);
+});
+
 test("admin mode serves the login page separately and hides public APIs", async (t) => {
   const server = startTestServer({ mode: "admin" });
   t.after(server.close);

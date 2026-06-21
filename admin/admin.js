@@ -301,15 +301,15 @@ function setState(element, text, type) {
 
 function defaultPrizes() {
   return [
-    { name: "Grand Prize", probability: 5, stock: 1, image_url: "" },
-    { name: "$100 Gift Card", probability: 10, stock: 5, image_url: "" },
-    { name: "Bluetooth Speaker", probability: 10, stock: 8, image_url: "" },
-    { name: "Coffee Voucher", probability: 15, stock: 30, image_url: "" },
-    { name: "VIP Upgrade", probability: 8, stock: 5, image_url: "" },
-    { name: "Movie Tickets", probability: 12, stock: 12, image_url: "" },
-    { name: "Merch Bundle", probability: 12, stock: 20, image_url: "" },
-    { name: "Bonus Entry", probability: 13, stock: "", image_url: "" },
-    { name: "Try Again", probability: 15, stock: "", image_url: "" }
+    { name: "$77 USDT", probability: 10, stock: "", image_url: "" },
+    { name: "#1 Ethereum", probability: 10, stock: "", image_url: "" },
+    { name: "Thanks for playing", probability: 10, stock: "", image_url: "" },
+    { name: "Apple Mac", probability: 10, stock: "", image_url: "" },
+    { name: "iPhone 17 Pro Max", probability: 10, stock: "", image_url: "" },
+    { name: "Thanks for playing", probability: 10, stock: "", image_url: "" },
+    { name: "20 shares of NVDA", probability: 10, stock: "", image_url: "" },
+    { name: "#1 oz gold", probability: 10, stock: "", image_url: "" },
+    { name: "Thanks for playing", probability: 10, stock: "", image_url: "" }
   ];
 }
 
