@@ -104,12 +104,18 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
   assert.doesNotMatch(page.body, /[\u3400-\u9fff]/);
   assert.doesNotMatch(page.body, /topbar-cta/);
   assert.doesNotMatch(page.body, /CryptoReward/);
-  assert.match(page.body, /JUMP QUANTUM™/);
+  assert.match(page.body, /<img class="brand-logo-image" src="\/assets\/jump-quantum-banner\.png" alt="JUMP QUANTUM™" \/>/);
   assert.match(page.body, /INVESTOR REWARDS EVENT/);
-  assert.match(page.body, /brand-jump/);
-  assert.match(page.body, /brand-quantum/);
+  assert.match(page.body, /<p class="event-title" aria-label="INVESTOR REWARDS EVENT">INVESTOR REWARDS EVENT<\/p>/);
+  assert.doesNotMatch(page.body, /brand-jump/);
+  assert.doesNotMatch(page.body, /brand-quantum/);
+  assert.doesNotMatch(page.body, /brand-name/);
   assert.match(page.body, /brand-divider/);
-  assert.doesNotMatch(page.body, /\/assets\/jump-quantum-logo\.png/);
+  assert.match(page.body, /\/assets\/jump-quantum-banner\.png/);
+
+  const logo = await server.request("/assets/jump-quantum-banner.png", { raw: true });
+  assert.equal(logo.status, 200);
+  assert.match(logo.headers.get("content-type") ?? "", /image\/png/);
 
   const script = await server.request("/app.js", {
     headers: { accept: "text/javascript" }
@@ -147,19 +153,19 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
   assert.match(styles.body, /\.wheel-prize-image img\s*{[^}]*height:\s*100%/s);
   assert.match(styles.body, /\.wheel-prize-image img\s*{[^}]*object-fit:\s*cover/s);
   assert.doesNotMatch(styles.body, /\.wheel\.is-crowded \.wheel-label img/);
-  assert.match(styles.body, /\.public-page \.topbar\s*{[^}]*flex-direction:\s*column/s);
-  assert.match(styles.body, /\.public-page \.topbar\s*{[^}]*align-items:\s*flex-start/s);
-  assert.match(styles.body, /\.event-title\s*{[^}]*text-align:\s*left/s);
-  assert.match(styles.body, /\.brand-jump\s*{[^}]*color:\s*#[a-fA-F0-9]{6}/s);
-  assert.match(styles.body, /\.brand-quantum\s*{[^}]*color:\s*#[a-fA-F0-9]{6}/s);
-  assert.match(styles.body, /body\.public-page\s*{[^}]*--topbar-offset:\s*clamp\(118px,\s*31\.2vw,\s*229px\)/s);
-  assert.match(styles.body, /body\.public-page\s*{[^}]*padding-top:\s*var\(--topbar-offset\)/s);
   assert.match(styles.body, /\.public-page \.topbar\s*{[^}]*position:\s*fixed/s);
-  assert.match(styles.body, /--brand-jump-size:\s*clamp\(24px,\s*7\.68vw,\s*51px\)/);
-  assert.match(styles.body, /--brand-quantum-size:\s*clamp\(14px,\s*4\.22vw,\s*28px\)/);
-  assert.match(styles.body, /--event-title-size:\s*clamp\(16px,\s*4\.99vw,\s*34px\)/);
-  assert.match(styles.body, /\.brand-name\s*{[^}]*flex-direction:\s*column/s);
-  assert.match(styles.body, /\.brand-quantum\s*{[^}]*font-size:\s*var\(--brand-quantum-size\)/s);
+  assert.match(styles.body, /\.brand-lockup\s*{[^}]*grid-template-columns:\s*auto auto minmax\(0,\s*auto\)/s);
+  assert.match(styles.body, /\.brand-logo-image\s*{[^}]*height:\s*var\(--brand-logo-height\)/s);
+  assert.match(styles.body, /\.brand-logo-image\s*{[^}]*object-fit:\s*contain/s);
+  assert.match(styles.body, /\.event-title\s*{[^}]*text-align:\s*left/s);
+  assert.match(styles.body, /\.event-title\s*{[^}]*white-space:\s*nowrap/s);
+  assert.doesNotMatch(styles.body, /\.brand-jump\s*{/);
+  assert.doesNotMatch(styles.body, /\.brand-quantum\s*{/);
+  assert.match(styles.body, /body\.public-page\s*{[^}]*--topbar-offset:\s*clamp\(80px,\s*17vw,\s*112px\)/s);
+  assert.match(styles.body, /body\.public-page\s*{[^}]*padding-top:\s*var\(--topbar-offset\)/s);
+  assert.match(styles.body, /--brand-logo-height:\s*clamp\(44px,\s*9vw,\s*72px\)/);
+  assert.match(styles.body, /--event-title-size:\s*clamp\(11px,\s*2\.2vw,\s*16px\)/);
+  assert.doesNotMatch(styles.body, /\.brand-name\s*{/);
   assert.match(styles.body, /\.brand-divider\s*{[^}]*linear-gradient\(90deg,\s*#ff2d55,\s*#ffd35a\)/s);
   assert.match(styles.body, /\.event-title\s*{[^}]*font-size:\s*var\(--event-title-size\)/s);
 
@@ -193,7 +199,8 @@ test("public page keeps the code entry flow and removes the unused reward intro"
   assert.match(page.body, /<form id="codeForm" class="code-form" novalidate>/);
   const codeFormHtml = page.body.slice(page.body.indexOf('<form id="codeForm"'), page.body.indexOf("</form>"));
   assert.doesNotMatch(codeFormHtml, /\srequired\b/);
-  assert.match(page.body, /JUMP QUANTUM™/);
+  assert.match(page.body, /brand-logo-image/);
+  assert.match(page.body, /\/assets\/jump-quantum-banner\.png/);
   assert.match(page.body, /INVESTOR REWARDS EVENT/);
   assert.match(page.body, /brand-divider/);
   assert.match(page.body, /Enter your code/);
