@@ -144,6 +144,8 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
   assert.match(script.body, /\/api\/public\/visits/);
   assert.match(script.body, /navigator\.language/);
   assert.match(script.body, /navigator\.userAgentData/);
+  assert.match(script.body, /await reportVisitor\(\{ code \}\)/);
+  assert.doesNotMatch(script.body, /void reportVisitor\(\)/);
   assert.doesNotMatch(script.body, /label\.append\(image\)/);
   assert.doesNotMatch(script.body, /getWheelSegments/);
   assert.doesNotMatch(script.body, /getPrizeWeight/);
@@ -668,6 +670,7 @@ test("admin sees visitor access records with code, IP, device, system, and langu
       "accept-language": "en-US,en;q=0.9"
     },
     body: JSON.stringify({
+      code: "TEST2026",
       device_model: "iPhone 15 Pro",
       device_type: "Mobile",
       system: "iOS 18",
@@ -696,6 +699,68 @@ test("admin sees visitor access records with code, IP, device, system, and langu
   assert.equal(logs.body.visits[0].device_type, "Mobile");
   assert.equal(logs.body.visits[0].system, "iOS 18");
   assert.equal(logs.body.visits[0].language, "en-US");
+});
+
+test("admin visit records only include reports with entered codes", async (t) => {
+  const server = startTestServer();
+  t.after(server.close);
+
+  await server.request("/api/admin/login", {
+    method: "POST",
+    body: JSON.stringify({ username: "admin", password: "admin" })
+  });
+
+  const blankVisit = await server.request("/api/public/visits", {
+    method: "POST",
+    headers: {
+      "x-forwarded-for": "192.0.2.11",
+      "user-agent": "Blank Visit Browser",
+      "accept-language": "en-US,en;q=0.9"
+    },
+    body: JSON.stringify({
+      device_model: "Windows PC",
+      device_type: "Desktop",
+      system: "Windows 10/11",
+      language: "en-US"
+    })
+  });
+  assert.equal(blankVisit.status, 201);
+  assert.ok(blankVisit.body.visitor_token);
+
+  let logs = await server.request("/api/admin/visits");
+  assert.equal(logs.status, 200);
+  assert.equal(logs.body.visits.length, 0);
+
+  const codedVisit = await server.request("/api/public/visits", {
+    method: "POST",
+    headers: {
+      "x-forwarded-for": "192.0.2.12",
+      "user-agent": "Coded Visit Browser",
+      "accept-language": "en-GB,en;q=0.9"
+    },
+    body: JSON.stringify({
+      visitor_token: blankVisit.body.visitor_token,
+      code: "ENTERED99",
+      device_model: "Mac",
+      device_type: "Desktop",
+      system: "macOS 15",
+      language: "en-GB"
+    })
+  });
+  assert.equal(codedVisit.status, 201);
+
+  logs = await server.request("/api/admin/visits");
+  assert.equal(logs.status, 200);
+  assert.equal(logs.body.visits.length, 1);
+  assert.equal(logs.body.visits[0].code, "ENTERED99");
+  assert.equal(logs.body.visits[0].ip_address, "192.0.2.12");
+  assert.equal(logs.body.visits[0].device_model, "Mac");
+
+  const exported = await server.request("/api/admin/visits/export", { raw: true });
+  const workbookText = exported.body.toString("utf8");
+  assert.match(workbookText, /ENTERED99/);
+  assert.doesNotMatch(workbookText, /Blank Visit Browser/);
+  assert.doesNotMatch(workbookText, /192\.0\.2\.11/);
 });
 
 test("admin can export visitor access records as an xlsx spreadsheet", async (t) => {

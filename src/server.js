@@ -234,7 +234,16 @@ export function createApp(options = {}) {
 
     app.post("/api/public/visits", (request, response, next) => {
       try {
-        const visit = recordVisit(db, createVisitInput(request, request.body ?? {}));
+        const visitInput = createVisitInput(request, request.body ?? {});
+        if (!sanitizeCode(visitInput.code)) {
+          response.status(201).json({
+            visitor_token: visitInput.visitor_token,
+            visit: null
+          });
+          return;
+        }
+
+        const visit = recordVisit(db, visitInput);
         response.status(201).json({
           visitor_token: visit.visitor_token,
           visit

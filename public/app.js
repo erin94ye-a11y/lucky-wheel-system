@@ -45,6 +45,7 @@ codeForm.addEventListener("submit", async (event) => {
   setMessage("Checking your code...", "");
 
   try {
+    await reportVisitor({ code });
     const response = await fetch(`/api/public/campaigns/${encodeURIComponent(code)}`);
     const data = await response.json();
     if (!response.ok) {
@@ -52,7 +53,6 @@ codeForm.addEventListener("submit", async (event) => {
     }
 
     activeCampaign = data.campaign;
-    await reportVisitor({ code });
     renderCampaign(activeCampaign);
     setMessage("Code verified. Your spin is ready.", "success");
   } catch (error) {
@@ -96,7 +96,6 @@ spinButton.addEventListener("click", async () => {
 });
 
 async function bootPublicPage() {
-  void reportVisitor();
   await loadPrizePool();
   const initialCode = new URLSearchParams(window.location.search).get("code");
   if (initialCode) {

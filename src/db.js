@@ -456,6 +456,7 @@ export function listVisits(db, limit = 100) {
     .prepare(`
       SELECT *
       FROM visits
+      WHERE code IS NOT NULL AND trim(code) <> ''
       ORDER BY created_at DESC, id DESC
       LIMIT ?
     `)
