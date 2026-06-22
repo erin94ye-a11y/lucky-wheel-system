@@ -63,6 +63,21 @@ function migrate(db) {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS visits (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      visitor_token TEXT NOT NULL UNIQUE,
+      code TEXT,
+      ip TEXT,
+      forwarded_for TEXT,
+      user_agent TEXT,
+      device_model TEXT,
+      device_type TEXT,
+      system TEXT,
+      language TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
 }
 
@@ -378,6 +393,76 @@ export function listDraws(db, limit = 100) {
     .map(serializeDraw);
 }
 
+export function recordVisit(db, input = {}) {
+  const visitorToken = sanitizeVisitorToken(input.visitor_token);
+  if (!visitorToken) {
+    const error = new Error("Visitor token is required.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const visit = {
+    visitor_token: visitorToken,
+    code: emptyToNull(sanitizeCode(input.code)),
+    ip: emptyToNull(limitText(input.ip, 120)),
+    forwarded_for: emptyToNull(limitText(input.forwarded_for, 240)),
+    user_agent: emptyToNull(limitText(input.user_agent, 600)),
+    device_model: emptyToNull(limitText(input.device_model, 160)),
+    device_type: emptyToNull(limitText(input.device_type, 60)),
+    system: emptyToNull(limitText(input.system, 120)),
+    language: emptyToNull(limitText(input.language, 120))
+  };
+
+  db.prepare(`
+    INSERT INTO visits (
+      visitor_token,
+      code,
+      ip,
+      forwarded_for,
+      user_agent,
+      device_model,
+      device_type,
+      system,
+      language
+    )
+    VALUES (
+      @visitor_token,
+      @code,
+      @ip,
+      @forwarded_for,
+      @user_agent,
+      @device_model,
+      @device_type,
+      @system,
+      @language
+    )
+    ON CONFLICT(visitor_token) DO UPDATE SET
+      code = COALESCE(excluded.code, visits.code),
+      ip = COALESCE(excluded.ip, visits.ip),
+      forwarded_for = COALESCE(excluded.forwarded_for, visits.forwarded_for),
+      user_agent = COALESCE(excluded.user_agent, visits.user_agent),
+      device_model = COALESCE(excluded.device_model, visits.device_model),
+      device_type = COALESCE(excluded.device_type, visits.device_type),
+      system = COALESCE(excluded.system, visits.system),
+      language = COALESCE(excluded.language, visits.language),
+      updated_at = datetime('now')
+  `).run(visit);
+
+  return getVisitByToken(db, visitorToken);
+}
+
+export function listVisits(db, limit = 100) {
+  return db
+    .prepare(`
+      SELECT *
+      FROM visits
+      ORDER BY created_at DESC, id DESC
+      LIMIT ?
+    `)
+    .all(limit)
+    .map(serializeVisit);
+}
+
 function getDrawById(db, id) {
   return serializeDraw(
     db
@@ -389,6 +474,10 @@ function getDrawById(db, id) {
       `)
       .get(id)
   );
+}
+
+function getVisitByToken(db, visitorToken) {
+  return serializeVisit(db.prepare("SELECT * FROM visits WHERE visitor_token = ?").get(visitorToken));
 }
 
 function listPrizes(db, campaignId) {
@@ -482,4 +571,34 @@ function serializeDraw(draw) {
     user_agent: draw.user_agent,
     created_at: draw.created_at
   };
+}
+
+function serializeVisit(visit) {
+  return {
+    id: Number(visit.id),
+    visitor_token: visit.visitor_token,
+    code: visit.code || "",
+    ip: visit.ip || "",
+    forwarded_for: visit.forwarded_for || "",
+    ip_address: visit.forwarded_for || visit.ip || "",
+    user_agent: visit.user_agent || "",
+    device_model: visit.device_model || "",
+    device_type: visit.device_type || "",
+    system: visit.system || "",
+    language: visit.language || "",
+    created_at: visit.created_at,
+    updated_at: visit.updated_at
+  };
+}
+
+function sanitizeVisitorToken(value) {
+  return limitText(value, 160).replace(/[^\w.-]/g, "");
+}
+
+function limitText(value, maxLength) {
+  return String(value ?? "").trim().slice(0, maxLength);
+}
+
+function emptyToNull(value) {
+  return value ? value : null;
 }

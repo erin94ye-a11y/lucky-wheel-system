@@ -139,6 +139,11 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
   assert.match(script.body, /getSpinRotation/);
   assert.match(script.body, /--label-rotation/);
   assert.match(script.body, /--label-track-width/);
+  assert.match(script.body, /collectVisitorInfo/);
+  assert.match(script.body, /reportVisitor/);
+  assert.match(script.body, /\/api\/public\/visits/);
+  assert.match(script.body, /navigator\.language/);
+  assert.match(script.body, /navigator\.userAgentData/);
   assert.doesNotMatch(script.body, /label\.append\(image\)/);
   assert.doesNotMatch(script.body, /getWheelSegments/);
   assert.doesNotMatch(script.body, /getPrizeWeight/);
@@ -276,7 +281,7 @@ test("admin prize pool UI explains each prize field", async (t) => {
   assert.match(adminPage.body, /图片：可填写图片地址或上传图片，保存后同步到转盘端/);
 });
 
-test("admin draw log UI includes an xlsx export button", async (t) => {
+test("admin access log UI replaces draw logs and includes an xlsx export button", async (t) => {
   const server = startTestServer({ mode: "admin" });
   t.after(server.close);
 
@@ -284,15 +289,23 @@ test("admin draw log UI includes an xlsx export button", async (t) => {
     headers: { accept: "text/html" }
   });
   assert.equal(adminPage.status, 200);
-  assert.match(adminPage.body, /id="exportDrawsButton"/);
+  assert.match(adminPage.body, /访问记录/);
+  assert.doesNotMatch(adminPage.body, /参与记录/);
+  assert.match(adminPage.body, /id="exportVisitsButton"/);
   assert.match(adminPage.body, /导出XLSX/);
+  for (const heading of ["时间", "代码", "IP地址", "设备型号", "设备类型", "系统", "使用语言"]) {
+    assert.match(adminPage.body, new RegExp(heading));
+  }
+  assert.doesNotMatch(adminPage.body, /<th>奖品<\/th>/);
 
   const adminScript = await server.request("/admin.js", {
     headers: { accept: "text/javascript" }
   });
   assert.equal(adminScript.status, 200);
-  assert.match(adminScript.body, /exportDrawsButton/);
-  assert.match(adminScript.body, /\/api\/admin\/draws\/export/);
+  assert.match(adminScript.body, /exportVisitsButton/);
+  assert.match(adminScript.body, /renderVisits/);
+  assert.match(adminScript.body, /\/api\/admin\/visits\/export/);
+  assert.doesNotMatch(adminScript.body, /renderDraws/);
 });
 
 test("admin default prize examples use investor rewards with blank stock", async (t) => {
@@ -611,7 +624,7 @@ test("admin upload creates wheel-sized images and public APIs normalize upload U
   assert.equal(draw.body.campaign.prizes[0].image_url, upload.body.image_url);
 });
 
-test("admin creates a campaign and public users can draw with IP logging", async (t) => {
+test("admin sees visitor access records with code, IP, device, system, and language", async (t) => {
   const server = startTestServer();
   t.after(server.close);
 
@@ -647,29 +660,49 @@ test("admin creates a campaign and public users can draw with IP logging", async
   assert.equal(publicView.body.prizes[0].name, "Phone");
   assert.equal(publicView.body.prizes[0].probability, undefined);
 
+  const visit = await server.request("/api/public/visits", {
+    method: "POST",
+    headers: {
+      "x-forwarded-for": "203.0.113.10",
+      "user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)",
+      "accept-language": "en-US,en;q=0.9"
+    },
+    body: JSON.stringify({
+      device_model: "iPhone 15 Pro",
+      device_type: "Mobile",
+      system: "iOS 18",
+      language: "en-US"
+    })
+  });
+  assert.equal(visit.status, 201);
+  assert.ok(visit.body.visitor_token);
+
   const draw = await server.request("/api/public/draw", {
     method: "POST",
     headers: {
       "x-forwarded-for": "203.0.113.10"
     },
-    body: JSON.stringify({ code: "TEST2026" })
+    body: JSON.stringify({ code: "TEST2026", visitor_token: visit.body.visitor_token })
   });
   assert.equal(draw.status, 200);
   assert.equal(draw.body.prize.name, "Phone");
 
-  const logs = await server.request("/api/admin/draws");
+  const logs = await server.request("/api/admin/visits");
   assert.equal(logs.status, 200);
-  assert.equal(logs.body.draws.length, 1);
-  assert.equal(logs.body.draws[0].code, "TEST2026");
-  assert.equal(logs.body.draws[0].prize_name, "Phone");
-  assert.equal(logs.body.draws[0].forwarded_for, "203.0.113.10");
+  assert.equal(logs.body.visits.length, 1);
+  assert.equal(logs.body.visits[0].code, "TEST2026");
+  assert.equal(logs.body.visits[0].ip_address, "203.0.113.10");
+  assert.equal(logs.body.visits[0].device_model, "iPhone 15 Pro");
+  assert.equal(logs.body.visits[0].device_type, "Mobile");
+  assert.equal(logs.body.visits[0].system, "iOS 18");
+  assert.equal(logs.body.visits[0].language, "en-US");
 });
 
-test("admin can export draw records as an xlsx spreadsheet", async (t) => {
+test("admin can export visitor access records as an xlsx spreadsheet", async (t) => {
   const server = startTestServer();
   t.after(server.close);
 
-  const denied = await server.request("/api/admin/draws/export", { raw: true });
+  const denied = await server.request("/api/admin/visits/export", { raw: true });
   assert.equal(denied.status, 401);
 
   await server.request("/api/admin/login", {
@@ -688,17 +721,24 @@ test("admin can export draw records as an xlsx spreadsheet", async (t) => {
     })
   });
 
-  const draw = await server.request("/api/public/draw", {
+  const visit = await server.request("/api/public/visits", {
     method: "POST",
     headers: {
       "x-forwarded-for": "198.51.100.24",
-      "user-agent": "Export Test Browser"
+      "user-agent": "Export Test Browser",
+      "accept-language": "fr-FR,fr;q=0.9"
     },
-    body: JSON.stringify({ code: "EXPORT26" })
+    body: JSON.stringify({
+      code: "EXPORT26",
+      device_model: "Pixel 9",
+      device_type: "Mobile",
+      system: "Android 15",
+      language: "fr-FR"
+    })
   });
-  assert.equal(draw.status, 200);
+  assert.equal(visit.status, 201);
 
-  const exported = await server.request("/api/admin/draws/export", { raw: true });
+  const exported = await server.request("/api/admin/visits/export", { raw: true });
   assert.equal(exported.status, 200);
   assert.equal(
     exported.headers.get("content-type"),
@@ -706,14 +746,16 @@ test("admin can export draw records as an xlsx spreadsheet", async (t) => {
   );
   assert.match(
     exported.headers.get("content-disposition"),
-    /attachment; filename="draw-records\.xlsx"/
+    /attachment; filename="access-records\.xlsx"/
   );
   assert.equal(exported.body.subarray(0, 2).toString("utf8"), "PK");
   const workbookText = exported.body.toString("utf8");
   assert.match(workbookText, /EXPORT26/);
-  assert.match(workbookText, /Phone/);
   assert.match(workbookText, /198\.51\.100\.24/);
-  assert.match(workbookText, /Export Test Browser/);
+  assert.match(workbookText, /Pixel 9/);
+  assert.match(workbookText, /Mobile/);
+  assert.match(workbookText, /Android 15/);
+  assert.match(workbookText, /fr-FR/);
 });
 
 test("admin can delete a generated lottery code", async (t) => {

@@ -20,9 +20,9 @@ const prizeRows = document.querySelector("#prizeRows");
 const prizeRowTemplate = document.querySelector("#prizeRowTemplate");
 const addPrizeButton = document.querySelector("#addPrizeButton");
 const resetPrizeButton = document.querySelector("#resetPrizeButton");
-const drawLogRows = document.querySelector("#drawLogRows");
-const logCount = document.querySelector("#logCount");
-const exportDrawsButton = document.querySelector("#exportDrawsButton");
+const visitLogRows = document.querySelector("#visitLogRows");
+const visitCount = document.querySelector("#visitCount");
+const exportVisitsButton = document.querySelector("#exportVisitsButton");
 
 const ADMIN_SYNC_INTERVAL_MS = 5000;
 
@@ -61,8 +61,8 @@ logoutButton.addEventListener("click", async () => {
 });
 
 refreshButton.addEventListener("click", () => refreshAll({ forcePrizes: true }));
-exportDrawsButton.addEventListener("click", () => {
-  window.location.href = "/api/admin/draws/export";
+exportVisitsButton.addEventListener("click", () => {
+  window.location.href = "/api/admin/visits/export";
 });
 
 codeGeneratorForm.addEventListener("submit", async (event) => {
@@ -150,10 +150,10 @@ function stopAdminSync() {
 }
 
 async function refreshAll(options = {}) {
-  const [campaignResponse, prizeResponse, drawResponse] = await Promise.all([
+  const [campaignResponse, prizeResponse, visitResponse] = await Promise.all([
     api("/api/admin/campaigns"),
     api("/api/admin/prizes"),
-    api("/api/admin/draws")
+    api("/api/admin/visits")
   ]);
 
   if (campaignResponse.ok) {
@@ -178,8 +178,8 @@ async function refreshAll(options = {}) {
     }
   }
 
-  if (drawResponse.ok) {
-    renderDraws(drawResponse.draws);
+  if (visitResponse.ok) {
+    renderVisits(visitResponse.visits);
   }
 }
 
@@ -325,18 +325,19 @@ function prizeListSignature(prizes) {
   );
 }
 
-function renderDraws(draws) {
-  logCount.textContent = `${draws.length} 条`;
-  drawLogRows.innerHTML = draws
+function renderVisits(visits) {
+  visitCount.textContent = `${visits.length} 条`;
+  visitLogRows.innerHTML = visits
     .map(
-      (draw) => `
+      (visit) => `
         <tr>
-          <td>${escapeHtml(formatTime(draw.created_at))}</td>
-          <td>${escapeHtml(draw.code)}</td>
-          <td>${escapeHtml(draw.prize_name)}</td>
-          <td>${escapeHtml(draw.ip || "")}</td>
-          <td>${escapeHtml(draw.forwarded_for || "")}</td>
-          <td>${escapeHtml(draw.user_agent || "")}</td>
+          <td>${escapeHtml(formatTime(visit.created_at))}</td>
+          <td>${escapeHtml(visit.code || "")}</td>
+          <td>${escapeHtml(visit.ip_address || "")}</td>
+          <td>${escapeHtml(visit.device_model || "")}</td>
+          <td>${escapeHtml(visit.device_type || "")}</td>
+          <td>${escapeHtml(visit.system || "")}</td>
+          <td>${escapeHtml(visit.language || "")}</td>
         </tr>
       `
     )

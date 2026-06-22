@@ -14,6 +14,27 @@ export function createDrawsWorkbook(draws) {
     ])
   ];
 
+  return createWorkbook(rows, "Draw Records");
+}
+
+export function createVisitsWorkbook(visits) {
+  const rows = [
+    ["时间", "代码", "IP地址", "设备型号", "设备类型", "系统", "使用语言"],
+    ...visits.map((visit) => [
+      visit.created_at,
+      visit.code || "",
+      visit.ip_address || visit.forwarded_for || visit.ip || "",
+      visit.device_model || "",
+      visit.device_type || "",
+      visit.system || "",
+      visit.language || ""
+    ])
+  ];
+
+  return createWorkbook(rows, "Access Records");
+}
+
+function createWorkbook(rows, sheetName) {
   return zipFiles([
     {
       name: "[Content_Types].xml",
@@ -37,7 +58,7 @@ export function createDrawsWorkbook(draws) {
       content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
   <sheets>
-    <sheet name="Draw Records" sheetId="1" r:id="rId1"/>
+    <sheet name="${escapeXml(sheetName)}" sheetId="1" r:id="rId1"/>
   </sheets>
 </workbook>`
     },

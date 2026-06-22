@@ -22,9 +22,12 @@ const segmentColors = [
   "#6d5dfc"
 ];
 
+const VISITOR_TOKEN_STORAGE_KEY = "jump_quantum_visitor_token";
+
 let activeCampaign = null;
 let currentRotation = 0;
 let isSpinning = false;
+let visitorToken = readStoredVisitorToken();
 
 codeForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -49,6 +52,7 @@ codeForm.addEventListener("submit", async (event) => {
     }
 
     activeCampaign = data.campaign;
+    await reportVisitor({ code });
     renderCampaign(activeCampaign);
     setMessage("Code verified. Your spin is ready.", "success");
   } catch (error) {
@@ -70,11 +74,17 @@ spinButton.addEventListener("click", async () => {
     const response = await fetch("/api/public/draw", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ code: activeCampaign.code })
+      body: JSON.stringify({
+        code: activeCampaign.code,
+        visitor_token: visitorToken
+      })
     });
     const data = await response.json();
     if (!response.ok) {
       throw new Error(data.error || "Unable to complete the draw. Please try again.");
+    }
+    if (data.visitor_token) {
+      storeVisitorToken(data.visitor_token);
     }
 
     spinToPrize(data.prize, data.campaign);
@@ -86,11 +96,152 @@ spinButton.addEventListener("click", async () => {
 });
 
 async function bootPublicPage() {
+  void reportVisitor();
   await loadPrizePool();
   const initialCode = new URLSearchParams(window.location.search).get("code");
   if (initialCode) {
     codeInput.value = initialCode.trim().toUpperCase();
     codeForm.requestSubmit();
+  }
+}
+
+async function reportVisitor(details = {}) {
+  try {
+    const visitorInfo = await collectVisitorInfo();
+    const response = await fetch("/api/public/visits", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        visitor_token: visitorToken,
+        ...visitorInfo,
+        ...details
+      })
+    });
+
+    if (!response.ok) {
+      return;
+    }
+
+    const data = await response.json();
+    if (data.visitor_token) {
+      storeVisitorToken(data.visitor_token);
+    }
+  } catch {
+    // Visitor logging must never block the prize wheel experience.
+  }
+}
+
+async function collectVisitorInfo() {
+  const userAgent = navigator.userAgent || "";
+  const language = navigator.language || navigator.languages?.[0] || "";
+  let userAgentData = {};
+
+  if (navigator.userAgentData?.getHighEntropyValues) {
+    try {
+      userAgentData = await navigator.userAgentData.getHighEntropyValues([
+        "model",
+        "platform",
+        "platformVersion"
+      ]);
+    } catch {
+      userAgentData = navigator.userAgentData || {};
+    }
+  }
+
+  return {
+    device_model: detectDeviceModel(userAgentData, userAgent),
+    device_type: detectDeviceType(userAgentData, userAgent),
+    system: detectSystem(userAgentData, userAgent),
+    language
+  };
+}
+
+function detectDeviceModel(userAgentData, userAgent) {
+  if (userAgentData.model) {
+    return userAgentData.model;
+  }
+
+  if (/iPhone/i.test(userAgent)) {
+    return "iPhone";
+  }
+  if (/iPad/i.test(userAgent)) {
+    return "iPad";
+  }
+
+  const androidModel = userAgent.match(/Android [^;)]*;\s*([^;)]+?)\s+Build/i);
+  if (androidModel?.[1]) {
+    return androidModel[1].trim();
+  }
+
+  if (/Macintosh|Mac OS X/i.test(userAgent)) {
+    return "Mac";
+  }
+  if (/Windows/i.test(userAgent)) {
+    return "Windows PC";
+  }
+  if (/Linux/i.test(userAgent)) {
+    return "Linux Device";
+  }
+
+  return "Unknown";
+}
+
+function detectDeviceType(userAgentData, userAgent) {
+  if (/iPad|Tablet/i.test(userAgent) || (/Android/i.test(userAgent) && !/Mobile/i.test(userAgent))) {
+    return "Tablet";
+  }
+
+  if (userAgentData.mobile || /Mobi|Android|iPhone|iPod/i.test(userAgent)) {
+    return "Mobile";
+  }
+
+  return "Desktop";
+}
+
+function detectSystem(userAgentData, userAgent) {
+  const platform = userAgentData.platform || navigator.platform || "";
+
+  const ios = userAgent.match(/(?:iPhone|iPad|iPod).*OS ([\d_]+)/i);
+  if (ios?.[1]) {
+    return `iOS ${ios[1].replace(/_/g, ".")}`;
+  }
+
+  const android = userAgent.match(/Android ([\d.]+)/i);
+  if (android?.[1]) {
+    return `Android ${android[1]}`;
+  }
+
+  const windows = userAgent.match(/Windows NT ([\d.]+)/i);
+  if (windows?.[1]) {
+    return windows[1] === "10.0" ? "Windows 10/11" : `Windows ${windows[1]}`;
+  }
+
+  const mac = userAgent.match(/Mac OS X ([\d_]+)/i);
+  if (mac?.[1]) {
+    return `macOS ${mac[1].replace(/_/g, ".")}`;
+  }
+
+  if (/Linux/i.test(userAgent)) {
+    return "Linux";
+  }
+
+  return platform || "Unknown";
+}
+
+function readStoredVisitorToken() {
+  try {
+    return window.localStorage.getItem(VISITOR_TOKEN_STORAGE_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+function storeVisitorToken(value) {
+  visitorToken = value;
+  try {
+    window.localStorage.setItem(VISITOR_TOKEN_STORAGE_KEY, value);
+  } catch {
+    // Some embedded browsers disable local storage.
   }
 }
 

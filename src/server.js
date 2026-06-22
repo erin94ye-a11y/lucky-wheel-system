@@ -16,14 +16,16 @@ import {
   listGlobalPrizes,
   listCampaigns,
   listDraws,
+  listVisits,
   openDatabase,
   performDraw,
   publicCampaign,
+  recordVisit,
   replaceGlobalPrizes,
   updateCampaign
 } from "./db.js";
 import { sanitizeCode } from "./lottery.js";
-import { createDrawsWorkbook } from "./xlsx.js";
+import { createDrawsWorkbook, createVisitsWorkbook } from "./xlsx.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -200,6 +202,20 @@ export function createApp(options = {}) {
       response.setHeader("content-disposition", 'attachment; filename="draw-records.xlsx"');
       response.send(workbook);
     });
+
+    app.get("/api/admin/visits", requireAdmin(sessionSecret), (_request, response) => {
+      response.json({ visits: listVisits(db) });
+    });
+
+    app.get("/api/admin/visits/export", requireAdmin(sessionSecret), (_request, response) => {
+      const workbook = createVisitsWorkbook(listVisits(db, 100000));
+      response.setHeader(
+        "content-type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
+      response.setHeader("content-disposition", 'attachment; filename="access-records.xlsx"');
+      response.send(workbook);
+    });
   }
 
   if (publicEnabled) {
@@ -216,6 +232,18 @@ export function createApp(options = {}) {
       }
     });
 
+    app.post("/api/public/visits", (request, response, next) => {
+      try {
+        const visit = recordVisit(db, createVisitInput(request, request.body ?? {}));
+        response.status(201).json({
+          visitor_token: visit.visitor_token,
+          visit
+        });
+      } catch (error) {
+        next(error);
+      }
+    });
+
     app.post("/api/public/draw", (request, response, next) => {
       try {
         const result = performDraw(db, sanitizeCode(request.body?.code), {
@@ -223,6 +251,10 @@ export function createApp(options = {}) {
           forwardedFor: request.get("x-forwarded-for") ?? "",
           userAgent: request.get("user-agent") ?? ""
         });
+        const visit = recordVisit(db, createVisitInput(request, {
+          ...(request.body ?? {}),
+          code: result.campaign.code
+        }));
 
         response.json({
           prize: {
@@ -234,6 +266,7 @@ export function createApp(options = {}) {
             id: result.draw.id,
             created_at: result.draw.created_at
           },
+          visitor_token: visit.visitor_token,
           campaign: toPublicCampaign(result.campaign, { validate: false })
         });
       } catch (error) {
@@ -250,6 +283,25 @@ export function createApp(options = {}) {
   });
 
   return app;
+}
+
+function createVisitInput(request, input = {}) {
+  return {
+    visitor_token: input.visitor_token || crypto.randomUUID(),
+    code: input.code,
+    ip: request.ip,
+    forwarded_for: request.get("x-forwarded-for") ?? "",
+    user_agent: request.get("user-agent") ?? "",
+    device_model: input.device_model,
+    device_type: input.device_type,
+    system: input.system,
+    language: input.language || normalizedLanguageHeader(request.get("accept-language"))
+  };
+}
+
+function normalizedLanguageHeader(value) {
+  const language = String(value ?? "").trim();
+  return language === "*" ? "" : language;
 }
 
 async function savePrizeImage(file, uploadDir) {
