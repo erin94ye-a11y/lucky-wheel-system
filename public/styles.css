@@ -881,6 +881,57 @@ body.public-page {
   color: #ffc400;
 }
 
+.vision-panel {
+  background:
+    linear-gradient(90deg, rgba(255, 45, 85, 0.9), rgba(255, 211, 90, 0.9)) top / 100% 3px no-repeat,
+    linear-gradient(155deg, rgba(17, 27, 47, 0.97), rgba(7, 13, 25, 0.95));
+  border: 1px solid rgba(91, 113, 151, 0.38);
+  border-radius: 28px;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.34);
+  display: grid;
+  gap: 18px;
+  grid-column: 1 / -1;
+  overflow: hidden;
+  padding: clamp(24px, 5vw, 38px);
+}
+
+.vision-heading {
+  display: grid;
+  gap: 8px;
+}
+
+.vision-heading span {
+  color: #ffd76a;
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.vision-panel h2 {
+  color: #f8fbff;
+  font-size: clamp(26px, 7vw, 42px);
+  line-height: 1.05;
+  margin: 0;
+}
+
+.vision-copy {
+  color: #aab7cb;
+  display: grid;
+  font-size: clamp(14px, 3.5vw, 16px);
+  gap: 14px;
+  line-height: 1.72;
+}
+
+.vision-copy p {
+  margin: 0;
+}
+
+.vision-copy p:first-child {
+  color: #f8fbff;
+  font-weight: 800;
+}
+
 .login-shell {
   align-items: center;
   display: grid;

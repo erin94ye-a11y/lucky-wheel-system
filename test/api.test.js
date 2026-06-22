@@ -110,6 +110,11 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
   assert.doesNotMatch(page.body, /brand-jump/);
   assert.doesNotMatch(page.body, /brand-quantum/);
   assert.doesNotMatch(page.body, /brand-name/);
+  assert.match(page.body, /<section class="vision-panel" aria-labelledby="visionTitle">/);
+  assert.match(page.body, /<h2 id="visionTitle">Our Vision<\/h2>/);
+  assert.match(page.body, /success should be shared/);
+  assert.match(page.body, /appreciation, partnership, and long-term growth/);
+  assert.ok(page.body.indexOf('id="resultPanel"') < page.body.indexOf('class="vision-panel"'));
   assert.match(page.body, /brand-divider/);
   assert.match(page.body, /\/assets\/jump-quantum-banner\.png/);
 
@@ -168,6 +173,10 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
   assert.doesNotMatch(styles.body, /\.brand-name\s*{/);
   assert.match(styles.body, /\.brand-divider\s*{[^}]*linear-gradient\(90deg,\s*#ff2d55,\s*#ffd35a\)/s);
   assert.match(styles.body, /\.event-title\s*{[^}]*font-size:\s*var\(--event-title-size\)/s);
+  assert.match(styles.body, /\.vision-panel\s*{[^}]*border-radius:\s*28px/s);
+  assert.match(styles.body, /\.vision-panel\s*{[^}]*grid-column:\s*1\s*\/\s*-1/s);
+  assert.match(styles.body, /\.vision-panel h2\s*{[^}]*font-size:\s*clamp\(26px,\s*7vw,\s*42px\)/s);
+  assert.match(styles.body, /\.vision-copy\s*{[^}]*line-height:\s*1\.72/s);
 
   const fallbackPrizeNames = [
     "Grand Prize",
@@ -205,6 +214,8 @@ test("public page keeps the code entry flow and removes the unused reward intro"
   assert.match(page.body, /brand-divider/);
   assert.match(page.body, /Enter your code/);
   assert.match(page.body, /Prize Wheel/);
+  assert.match(page.body, /Our Vision/);
+  assert.match(page.body, /The Investor Rewards Event was created to recognize and reward/);
   assert.doesNotMatch(page.body, /reward-kicker/);
   assert.doesNotMatch(page.body, /stats-strip/);
   assert.doesNotMatch(page.body, /ticket-preview/);
