@@ -897,15 +897,6 @@ body.public-page {
 
 .vision-heading {
   display: grid;
-  gap: 8px;
-}
-
-.vision-heading span {
-  color: #ffd76a;
-  font-size: 12px;
-  font-weight: 950;
-  letter-spacing: 0;
-  text-transform: uppercase;
 }
 
 .vision-panel h2 {

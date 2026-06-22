@@ -112,6 +112,7 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
   assert.doesNotMatch(page.body, /brand-name/);
   assert.match(page.body, /<section class="vision-panel" aria-labelledby="visionTitle">/);
   assert.match(page.body, /<h2 id="visionTitle">Our Vision<\/h2>/);
+  assert.doesNotMatch(page.body, /<span>Investor Rewards Event<\/span>/);
   assert.match(page.body, /success should be shared/);
   assert.match(page.body, /appreciation, partnership, and long-term growth/);
   assert.ok(page.body.indexOf('id="resultPanel"') < page.body.indexOf('class="vision-panel"'));
@@ -177,6 +178,7 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
   assert.match(styles.body, /\.vision-panel\s*{[^}]*grid-column:\s*1\s*\/\s*-1/s);
   assert.match(styles.body, /\.vision-panel h2\s*{[^}]*font-size:\s*clamp\(26px,\s*7vw,\s*42px\)/s);
   assert.match(styles.body, /\.vision-copy\s*{[^}]*line-height:\s*1\.72/s);
+  assert.doesNotMatch(styles.body, /\.vision-heading span\s*{/);
 
   const fallbackPrizeNames = [
     "Grand Prize",
