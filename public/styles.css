@@ -107,7 +107,7 @@ input:focus {
   border-radius: 10px;
   display: block;
   height: var(--brand-logo-height);
-  max-width: min(34vw, 220px);
+  max-width: min(28vw, 170px);
   object-fit: contain;
   width: auto;
 }
@@ -116,7 +116,7 @@ input:focus {
   background: linear-gradient(90deg, #ff2d55, #ffd35a);
   border-radius: 999px;
   display: block;
-  height: clamp(30px, 6vw, 54px);
+  height: clamp(24px, 5vw, 40px);
   width: 3px;
 }
 
@@ -654,7 +654,7 @@ button.danger:hover {
 }
 
 body.public-page {
-  --topbar-offset: clamp(80px, 17vw, 112px);
+  --topbar-offset: clamp(64px, 13vw, 86px);
   background:
     radial-gradient(circle at 84% 16%, rgba(255, 199, 0, 0.15), transparent 23%),
     radial-gradient(circle at 16% 42%, rgba(0, 229, 255, 0.08), transparent 30%),
@@ -667,7 +667,7 @@ body.public-page {
 }
 
 .public-page .topbar {
-  --brand-logo-height: clamp(44px, 9vw, 72px);
+  --brand-logo-height: clamp(32px, 7vw, 50px);
   --event-title-size: clamp(11px, 2.2vw, 16px);
   align-items: center;
   background:
@@ -1286,7 +1286,7 @@ td {
   }
 
   .brand-divider {
-    height: 32px;
+    height: 28px;
     width: 2px;
   }
 

@@ -161,9 +161,9 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
   assert.match(styles.body, /\.event-title\s*{[^}]*white-space:\s*nowrap/s);
   assert.doesNotMatch(styles.body, /\.brand-jump\s*{/);
   assert.doesNotMatch(styles.body, /\.brand-quantum\s*{/);
-  assert.match(styles.body, /body\.public-page\s*{[^}]*--topbar-offset:\s*clamp\(80px,\s*17vw,\s*112px\)/s);
+  assert.match(styles.body, /body\.public-page\s*{[^}]*--topbar-offset:\s*clamp\(64px,\s*13vw,\s*86px\)/s);
   assert.match(styles.body, /body\.public-page\s*{[^}]*padding-top:\s*var\(--topbar-offset\)/s);
-  assert.match(styles.body, /--brand-logo-height:\s*clamp\(44px,\s*9vw,\s*72px\)/);
+  assert.match(styles.body, /--brand-logo-height:\s*clamp\(32px,\s*7vw,\s*50px\)/);
   assert.match(styles.body, /--event-title-size:\s*clamp\(11px,\s*2\.2vw,\s*16px\)/);
   assert.doesNotMatch(styles.body, /\.brand-name\s*{/);
   assert.match(styles.body, /\.brand-divider\s*{[^}]*linear-gradient\(90deg,\s*#ff2d55,\s*#ffd35a\)/s);
