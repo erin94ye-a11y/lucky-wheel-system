@@ -122,6 +122,9 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
   const logo = await server.request("/assets/jump-quantum-banner.png", { raw: true });
   assert.equal(logo.status, 200);
   assert.match(logo.headers.get("content-type") ?? "", /image\/png/);
+  const logoMeta = await sharp(logo.body).metadata();
+  assert.equal(logoMeta.width, 600);
+  assert.equal(logoMeta.height, 294);
 
   const script = await server.request("/app.js", {
     headers: { accept: "text/javascript" }
