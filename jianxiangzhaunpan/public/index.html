@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en-US">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JUMP QUTARIS Investor Rewards Event</title>
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="public-page">
+    <header class="topbar">
+      <div class="brand-lockup">
+        <a class="brand" href="/" aria-label="JUMP QUTARIS">
+          <img class="brand-logo-image" src="/assets/jump-quantum-banner.png" alt="JUMP QUTARIS" />
+        </a>
+        <span class="brand-divider" aria-hidden="true"></span>
+        <p class="event-title" aria-label="INVESTOR REWARDS EVENT">INVESTOR REWARDS EVENT</p>
+      </div>
+    </header>
+
+    <main class="public-shell">
+      <section class="entry-panel" id="entryPanel">
+        <form id="codeForm" class="code-form" novalidate>
+          <input
+            id="codeInput"
+            name="code"
+            autocomplete="off"
+            placeholder="Enter your code"
+            aria-label="Lucky code"
+          />
+          <button type="submit">Unlock Spin</button>
+        </form>
+        <div class="process-strip" aria-label="Draw steps">
+          <div>
+            <span>1</span>
+            <strong>Enter Code</strong>
+          </div>
+          <div>
+            <span>2</span>
+            <strong>Verify Pass</strong>
+          </div>
+          <div>
+            <span>3</span>
+            <strong>Spin Wheel</strong>
+          </div>
+        </div>
+        <p class="form-message" id="message" role="status"></p>
+      </section>
+
+      <section class="welcome-stage is-hidden" id="welcomeStage">
+        <div class="welcome-card">
+          <div class="mini-wheel" aria-hidden="true">
+            <span></span>
+          </div>
+          <div>
+            <h2>Your wheel is ready</h2>
+            <p>After your code is verified, this area shows the prize wheel and remaining spin access.</p>
+          </div>
+        </div>
+        <div class="comfort-grid">
+          <div>
+            <strong>Prize Pool</strong>
+            <span>Managed in admin</span>
+          </div>
+          <div>
+            <strong>Draw Logs</strong>
+            <span>Results are saved</span>
+          </div>
+          <div>
+            <strong>Use Check</strong>
+            <span>Repeat protection</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="wheel-stage" id="wheelStage" aria-live="polite">
+        <div class="wheel-copy">
+          <h2 id="campaignTitle">Prize Wheel</h2>
+        </div>
+        <div class="wheel-wrap">
+          <div class="wheel-pointer" aria-hidden="true"></div>
+          <div class="wheel" id="wheel"></div>
+          <button class="spin-button" id="spinButton" type="button" disabled>Enter Code</button>
+        </div>
+        <div class="result-panel is-hidden" id="resultPanel">
+          <img id="resultImage" alt="" />
+          <div>
+            <p>Result</p>
+            <h3 id="resultName"></h3>
+          </div>
+        </div>
+      </section>
+
+      <section class="vision-panel" aria-labelledby="visionTitle">
+        <div class="vision-heading">
+          <h2 id="visionTitle">Our Vision</h2>
+        </div>
+        <div class="vision-copy">
+          <p>At JUMP QUTARIS, we believe that success should be shared.</p>
+          <p>The Investor Rewards Event was created to recognize and reward the members who place their trust in our vision, our research, and our growing investment community.</p>
+          <p>As we continue building a stronger future together, every participant deserves the opportunity to benefit from the value they help create.</p>
+          <p>This event is not simply about rewards&mdash;it is about appreciation, partnership, and long-term growth.</p>
+        </div>
+      </section>
+    </main>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

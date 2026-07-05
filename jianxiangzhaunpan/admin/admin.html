@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>活动转盘后台</title>
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="admin-page">
+    <main class="login-shell" id="loginView">
+      <form class="login-panel" id="loginForm">
+        <span class="brand-mark">奖</span>
+        <h1>后台登录</h1>
+        <label>
+          账号
+          <input id="username" autocomplete="username" value="admin" required />
+        </label>
+        <label>
+          密码
+          <input id="password" type="password" autocomplete="current-password" value="admin" required />
+        </label>
+        <button type="submit">登录</button>
+        <p class="form-message" id="loginMessage" role="status"></p>
+      </form>
+    </main>
+
+    <section class="admin-shell is-hidden" id="adminView">
+      <header class="admin-header">
+        <a class="brand" href="/">
+          <span class="brand-mark">奖</span>
+          <span>活动转盘后台</span>
+        </a>
+        <div class="admin-actions">
+          <button class="secondary" id="refreshButton" type="button">刷新</button>
+          <button class="danger" id="logoutButton" type="button">退出</button>
+        </div>
+      </header>
+
+      <div class="admin-grid">
+        <section class="panel code-generator-panel">
+          <div class="panel-title">
+            <h2>批量生成抽奖代码</h2>
+            <span id="codeState"></span>
+          </div>
+          <form id="codeGeneratorForm" class="campaign-form">
+            <div class="form-grid">
+              <label>
+                生成数量
+                <input id="quantityInput" type="number" min="1" max="500" value="1" required />
+              </label>
+              <label>
+                每个代码可抽次数
+                <input id="maxUsesInput" type="number" min="1" value="1" required />
+              </label>
+              <label>
+                过期时间
+                <input id="expiresInput" type="datetime-local" />
+              </label>
+            </div>
+            <label class="switch-row">
+              <input id="activeInput" type="checkbox" checked />
+              <span>生成后立即启用</span>
+            </label>
+            <div class="submit-row">
+              <button type="submit">生成代码</button>
+            </div>
+          </form>
+          <div class="generated-code-panel">
+            <div class="panel-title compact-title">
+              <h3>最近生成</h3>
+              <span id="generatedCount"></span>
+            </div>
+            <div class="generated-codes" id="generatedCodes"></div>
+          </div>
+        </section>
+
+        <section class="panel editor-panel prize-settings-panel">
+          <div class="panel-title">
+            <h2>统一奖品池设置</h2>
+            <span id="prizeState"></span>
+          </div>
+          <form id="prizeForm" class="campaign-form">
+            <div class="prize-toolbar">
+              <h3>奖品、图片、概率与库存</h3>
+              <button class="secondary" id="addPrizeButton" type="button">添加奖品</button>
+            </div>
+            <div class="prize-guide" aria-label="奖品字段说明">
+              <p>奖品名称：转盘端显示的奖品文字</p>
+              <p>概率权重：数值越大越容易中奖，0 表示不会中奖</p>
+              <p>库存：留空表示不限量，填 0 表示不可抽中</p>
+              <p>图片：可填写图片地址或上传图片，保存后同步到转盘端</p>
+            </div>
+            <div class="prize-table" id="prizeRows"></div>
+            <div class="submit-row">
+              <button type="submit">保存奖品池</button>
+              <button class="secondary" id="resetPrizeButton" type="button">恢复默认示例</button>
+            </div>
+          </form>
+        </section>
+
+        <aside class="panel campaign-list-panel">
+          <div class="panel-title">
+            <h2>已生成代码</h2>
+            <span id="codeCount"></span>
+          </div>
+          <div class="campaign-list" id="campaignList"></div>
+        </aside>
+
+        <section class="panel logs-panel">
+          <div class="panel-title">
+            <h2>访问记录</h2>
+            <div class="panel-actions">
+              <span id="visitCount"></span>
+              <button class="secondary small-button" id="exportVisitsButton" type="button">导出XLSX</button>
+            </div>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>时间</th>
+                  <th>代码</th>
+                  <th>IP地址</th>
+                  <th>设备型号</th>
+                  <th>设备类型</th>
+                  <th>系统</th>
+                  <th>使用语言</th>
+                </tr>
+              </thead>
+              <tbody id="visitLogRows"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <template id="prizeRowTemplate">
+      <div class="prize-row">
+        <input class="prize-name" placeholder="奖品名称" required />
+        <input class="prize-probability" type="number" min="0" step="0.01" placeholder="概率权重" required />
+        <input class="prize-stock" type="number" min="0" placeholder="库存 空=不限" />
+        <input class="prize-image" placeholder="图片地址" />
+        <label class="upload-button">
+          上传图
+          <input class="prize-upload" type="file" accept="image/*" />
+        </label>
+        <button class="icon-button remove-prize" type="button" aria-label="删除奖品">×</button>
+      </div>
+    </template>
+
+    <script src="/admin.js" type="module"></script>
+  </body>
+</html>
