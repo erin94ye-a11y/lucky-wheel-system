@@ -107,6 +107,8 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
   assert.match(page.body, /<img class="brand-logo-image" src="\/assets\/jump-quantum-banner\.png" alt="JUMP QUTARIS" \/>/);
   assert.match(page.body, /INVESTOR REWARDS EVENT/);
   assert.match(page.body, /<p class="event-title" aria-label="INVESTOR REWARDS EVENT">INVESTOR REWARDS EVENT<\/p>/);
+  assert.match(page.body, /<button class="spin-button" id="spinButton" type="button" disabled>Go<\/button>/);
+  assert.doesNotMatch(page.body, /id="spinButton"[^>]*>Enter Code<\/button>/);
   assert.doesNotMatch(page.body, /brand-jump/);
   assert.doesNotMatch(page.body, /brand-quantum/);
   assert.doesNotMatch(page.body, /brand-name/);
@@ -153,6 +155,8 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
   assert.doesNotMatch(script.body, /getWheelSegments/);
   assert.doesNotMatch(script.body, /getPrizeWeight/);
   assert.match(script.body, /const slice = 360 \/ prizes\.length/);
+  assert.match(script.body, /spinButton\.textContent = "Go"/);
+  assert.doesNotMatch(script.body, /spinButton\.textContent = "Enter Code"/);
   assert.match(script.body, /wheel-surface/);
   assert.match(script.body, /wheel-divider/);
   assert.doesNotMatch(script.body, /wheel-backplate/);

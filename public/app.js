@@ -265,7 +265,7 @@ function renderStaticPrizePool(prizes) {
   welcomeStage.classList.add("is-hidden");
   wheelStage.classList.remove("is-hidden");
   spinButton.disabled = true;
-  spinButton.textContent = "Enter Code";
+  spinButton.textContent = "Go";
   renderWheel(prizes);
 }
 
