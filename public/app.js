@@ -294,12 +294,26 @@ function renderWheel(prizes) {
     })
     .join(", ");
 
-  wheel.style.background = `conic-gradient(from -90deg, ${gradient})`;
+  applyWheelRotation(currentRotation);
   wheel.classList.toggle("is-dense", dense);
   wheel.classList.toggle("is-crowded", crowded);
   wheel.innerHTML = "";
 
   const wheelLayout = getWheelLayout();
+  const surface = document.createElement("div");
+  surface.className = "wheel-surface";
+  surface.style.background = `conic-gradient(${gradient})`;
+  surface.setAttribute("aria-hidden", "true");
+  wheel.append(surface);
+
+  prizes.forEach((_, index) => {
+    const boundaryAngle = index * slice - 90;
+    const divider = document.createElement("span");
+    divider.className = "wheel-divider";
+    divider.style.setProperty("--divider-rotation", `${Number(boundaryAngle.toFixed(3))}deg`);
+    wheel.append(divider);
+  });
+
   prizes.forEach((prize, index) => {
     const angle = index * slice + slice / 2 - 90;
 
@@ -443,7 +457,7 @@ function spinToPrize(prize, updatedCampaign) {
   const targetRotation = getSpinRotation(prizes, prize, currentRotation);
 
   currentRotation = targetRotation;
-  wheel.style.transform = `rotate(${currentRotation}deg)`;
+  applyWheelRotation(currentRotation);
 
   window.setTimeout(() => {
     resultName.textContent = prize.name;
@@ -456,9 +470,14 @@ function spinToPrize(prize, updatedCampaign) {
     }
     resultPanel.classList.remove("is-hidden");
     renderCampaign(updatedCampaign);
-    wheel.style.transform = `rotate(${currentRotation}deg)`;
+    applyWheelRotation(currentRotation);
     setMessage("Spin complete.", "success");
   }, 4200);
+}
+
+function applyWheelRotation(rotation) {
+  const rotationValue = `${Number(rotation.toFixed(3))}deg`;
+  wheel.style.transform = `rotate(${rotationValue})`;
 }
 
 function getSpinRotation(prizes, prize, rotation) {

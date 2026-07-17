@@ -104,7 +104,7 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
   assert.doesNotMatch(page.body, /[\u3400-\u9fff]/);
   assert.doesNotMatch(page.body, /topbar-cta/);
   assert.doesNotMatch(page.body, /CryptoReward/);
-  assert.match(page.body, /<img class="brand-logo-image" src="\/assets\/jump-quantum-banner\.png" alt="JUMP QUANTUM™" \/>/);
+  assert.match(page.body, /<img class="brand-logo-image" src="\/assets\/jump-quantum-banner\.png" alt="JUMP QUTARIS" \/>/);
   assert.match(page.body, /INVESTOR REWARDS EVENT/);
   assert.match(page.body, /<p class="event-title" aria-label="INVESTOR REWARDS EVENT">INVESTOR REWARDS EVENT<\/p>/);
   assert.doesNotMatch(page.body, /brand-jump/);
@@ -153,6 +153,15 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
   assert.doesNotMatch(script.body, /getWheelSegments/);
   assert.doesNotMatch(script.body, /getPrizeWeight/);
   assert.match(script.body, /const slice = 360 \/ prizes\.length/);
+  assert.match(script.body, /wheel-surface/);
+  assert.match(script.body, /wheel-divider/);
+  assert.doesNotMatch(script.body, /wheel-backplate/);
+  assert.doesNotMatch(script.body, /wheel-board-boundary/);
+  assert.doesNotMatch(script.body, /wheel-sector-boundary/);
+  assert.doesNotMatch(script.body, /renderWheelBackplate/);
+  assert.doesNotMatch(script.body, /describeAnnularSector/);
+  assert.match(script.body, /surface\.style\.background = `conic-gradient\(\$\{gradient\}\)`/);
+  assert.doesNotMatch(script.body, /conic-gradient\(from -90deg, \$\{gradient\}\)/);
 
   const styles = await server.request("/styles.css", {
     headers: { accept: "text/css" }
@@ -189,6 +198,15 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
   assert.match(styles.body, /\.vision-panel h2\s*{[^}]*font-size:\s*clamp\(26px,\s*7vw,\s*42px\)/s);
   assert.match(styles.body, /\.vision-copy\s*{[^}]*line-height:\s*1\.72/s);
   assert.doesNotMatch(styles.body, /\.vision-heading span\s*{/);
+  assert.match(styles.body, /\.wheel-surface\s*{/);
+  assert.match(styles.body, /\.wheel-divider\s*{/);
+  const wheelDividerRule = styles.body.match(/\.wheel-divider\s*{([\s\S]*?)\n}/)?.[1] || "";
+  assert.match(wheelDividerRule, /rgba\(255,\s*255,\s*255,\s*0\.96\)/);
+  assert.match(wheelDividerRule, /#ffffff/);
+  assert.doesNotMatch(wheelDividerRule, /rgba\(255,\s*42,\s*87|#ff4b70|rgba\(255,\s*38,\s*83/);
+  assert.doesNotMatch(styles.body, /\.wheel-backplate/);
+  assert.doesNotMatch(styles.body, /\.wheel-board-boundary/);
+  assert.doesNotMatch(styles.body, /\.wheel-sector-boundary/);
 
   const fallbackPrizeNames = [
     "Grand Prize",
