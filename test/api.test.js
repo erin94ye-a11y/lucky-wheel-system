@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -15,7 +16,7 @@ function startTestServer(options = {}) {
   const app = createApp({
     databasePath,
     uploadDir: join(workspace, "uploads"),
-    sessionSecret: "test-secret",
+    sessionSecret: options.useGeneratedSessionSecret ? undefined : "test-secret",
     adminUser: "admin",
     adminPassword: "admin",
     mode: options.mode ?? "all"
@@ -296,6 +297,7 @@ test("admin independent code generator UI submits one prize snapshot", async (t)
   assert.doesNotMatch(adminScript.body, /\/api\/admin\/codes\/bulk/);
   assert.match(adminScript.body, /api\("\/api\/admin\/codes"/);
   assert.match(adminScript.body, /prizes: readCodeProbabilityForm\(\)/);
+  assert.match(adminScript.body, /inventory_key: String\(prize\.inventory_key \?\? ""\)/);
   assert.match(adminScript.body, /deleteCampaign/);
   assert.match(adminScript.body, /method: "DELETE"/);
 });
@@ -423,6 +425,24 @@ test("admin mode serves the login page separately and hides public APIs", async 
 
   const publicApi = await server.request("/api/public/campaigns/TEST2026");
   assert.equal(publicApi.status, 404);
+});
+
+test("missing session configuration uses an unpredictable signing secret", async (t) => {
+  const server = startTestServer({ mode: "all", useGeneratedSessionSecret: true });
+  t.after(server.close);
+
+  const body = Buffer.from(
+    JSON.stringify({ username: "admin", expiresAt: Date.now() + 60_000 })
+  ).toString("base64url");
+  const signature = crypto
+    .createHmac("sha256", "change-this-secret-in-production")
+    .update(body)
+    .digest("base64url");
+
+  const forged = await server.request("/api/admin/me", {
+    headers: { cookie: `lucky_admin=${body}.${signature}` }
+  });
+  assert.equal(forged.status, 401);
 });
 
 test("admin can generate an unused lottery code", async (t) => {
@@ -572,6 +592,17 @@ test("admin can delete all generated codes while preserving access records", asy
     body: JSON.stringify({ username: "admin", password: "admin" })
   });
 
+  const template = await server.request("/api/admin/prizes", {
+    method: "PUT",
+    body: JSON.stringify({
+      prizes: [
+        { name: "Prize A", probability: 50, stock: null, image_url: "" },
+        { name: "Prize B", probability: 50, stock: null, image_url: "" }
+      ]
+    })
+  });
+  assert.equal(template.status, 200);
+
   const generatedCodes = [];
   for (const winningPrize of ["Prize A", "Prize B"]) {
     const generated = await server.request("/api/admin/codes", {
@@ -579,14 +610,10 @@ test("admin can delete all generated codes while preserving access records", asy
       body: JSON.stringify({
         max_uses: 1,
         active: true,
-        prizes: [
-          {
-            name: winningPrize,
-            probability: 100,
-            stock: null,
-            image_url: ""
-          }
-        ]
+        prizes: template.body.prizes.map((prize) => ({
+          ...prize,
+          probability: prize.name === winningPrize ? 100 : 0
+        }))
       })
     });
     assert.equal(generated.status, 201);
@@ -760,6 +787,266 @@ test("generated codes keep independent prize probabilities", async (t) => {
   assert.equal(drawB.status, 200);
   assert.equal(drawA.body.prize.name, "Prize A");
   assert.equal(drawB.body.prize.name, "Prize B");
+});
+
+test("independent code probabilities still share finite template inventory", async (t) => {
+  const server = startTestServer({ mode: "all" });
+  t.after(server.close);
+
+  await server.request("/api/admin/login", {
+    method: "POST",
+    body: JSON.stringify({ username: "admin", password: "admin" })
+  });
+
+  const template = await server.request("/api/admin/prizes", {
+    method: "PUT",
+    body: JSON.stringify({
+      prizes: [
+        { name: "One Shared Prize", probability: 100, stock: 1, image_url: "" }
+      ]
+    })
+  });
+  assert.equal(template.status, 200);
+  const submittedPrizes = template.body.prizes.map((prize) => ({
+    name: prize.name,
+    probability: prize.probability,
+    stock: prize.stock,
+    image_url: prize.image_url,
+    sort_order: prize.sort_order
+  }));
+
+  const codes = [];
+  for (let index = 0; index < 2; index += 1) {
+    const generated = await server.request("/api/admin/codes", {
+      method: "POST",
+      body: JSON.stringify({
+        max_uses: 1,
+        active: true,
+        prizes: submittedPrizes
+      })
+    });
+    assert.equal(generated.status, 201);
+    codes.push(generated.body.campaign.code);
+  }
+
+  const firstDraw = await server.request("/api/public/draw", {
+    method: "POST",
+    body: JSON.stringify({ code: codes[0] })
+  });
+  assert.equal(firstDraw.status, 200);
+  assert.equal(firstDraw.body.prize.name, "One Shared Prize");
+
+  const secondDraw = await server.request("/api/public/draw", {
+    method: "POST",
+    body: JSON.stringify({ code: codes[1] })
+  });
+  assert.equal(secondDraw.status, 400);
+  assert.match(secondDraw.body.error, /inventory is sold out/i);
+});
+
+test("code generation rejects a template whose positive-probability inventory is exhausted", async (t) => {
+  const server = startTestServer({ mode: "all" });
+  t.after(server.close);
+
+  await server.request("/api/admin/login", {
+    method: "POST",
+    body: JSON.stringify({ username: "admin", password: "admin" })
+  });
+
+  const template = await server.request("/api/admin/prizes", {
+    method: "PUT",
+    body: JSON.stringify({
+      prizes: [{ name: "Last Prize", probability: 100, stock: 1, image_url: "" }]
+    })
+  });
+  const firstCode = await server.request("/api/admin/codes", {
+    method: "POST",
+    body: JSON.stringify({ max_uses: 1, active: true, prizes: template.body.prizes })
+  });
+  assert.equal(firstCode.status, 201);
+
+  const draw = await server.request("/api/public/draw", {
+    method: "POST",
+    body: JSON.stringify({ code: firstCode.body.campaign.code })
+  });
+  assert.equal(draw.status, 200);
+
+  const exhausted = await server.request("/api/admin/codes", {
+    method: "POST",
+    body: JSON.stringify({ max_uses: 1, active: true, prizes: template.body.prizes })
+  });
+  assert.equal(exhausted.status, 400);
+  assert.match(exhausted.body.error, /available inventory/i);
+});
+
+test("saving the same template without inventory keys does not reopen awarded stock", async (t) => {
+  const server = startTestServer({ mode: "all" });
+  t.after(server.close);
+
+  await server.request("/api/admin/login", {
+    method: "POST",
+    body: JSON.stringify({ username: "admin", password: "admin" })
+  });
+  const template = await server.request("/api/admin/prizes", {
+    method: "PUT",
+    body: JSON.stringify({
+      prizes: [{ name: "No Reopen", probability: 100, stock: 1, image_url: "" }]
+    })
+  });
+  const code = await server.request("/api/admin/codes", {
+    method: "POST",
+    body: JSON.stringify({ max_uses: 1, active: true, prizes: template.body.prizes })
+  });
+  const draw = await server.request("/api/public/draw", {
+    method: "POST",
+    body: JSON.stringify({ code: code.body.campaign.code })
+  });
+  assert.equal(draw.status, 200);
+
+  const legacySave = await server.request("/api/admin/prizes", {
+    method: "PUT",
+    body: JSON.stringify({
+      prizes: [{ name: "No Reopen", probability: 100, stock: 1, image_url: "" }]
+    })
+  });
+  assert.equal(legacySave.status, 200);
+
+  const reopened = await server.request("/api/admin/codes", {
+    method: "POST",
+    body: JSON.stringify({ max_uses: 1, active: true, prizes: legacySave.body.prizes })
+  });
+  assert.equal(reopened.status, 400);
+  assert.match(reopened.body.error, /available inventory/i);
+});
+
+test("inventory migration keeps awards recorded on campaign snapshots", async (t) => {
+  const originalServer = startTestServer({ mode: "all" });
+  t.after(originalServer.close);
+
+  await originalServer.request("/api/admin/login", {
+    method: "POST",
+    body: JSON.stringify({ username: "admin", password: "admin" })
+  });
+  const template = await originalServer.request("/api/admin/prizes", {
+    method: "PUT",
+    body: JSON.stringify({
+      prizes: [{ name: "Migrated Stock", probability: 100, stock: 1, image_url: "" }]
+    })
+  });
+
+  const codes = [];
+  for (let index = 0; index < 2; index += 1) {
+    const generated = await originalServer.request("/api/admin/codes", {
+      method: "POST",
+      body: JSON.stringify({ max_uses: 1, active: true, prizes: template.body.prizes })
+    });
+    codes.push(generated.body.campaign.code);
+  }
+
+  const firstDraw = await originalServer.request("/api/public/draw", {
+    method: "POST",
+    body: JSON.stringify({ code: codes[0] })
+  });
+  assert.equal(firstDraw.status, 200);
+
+  const damagedDb = new Database(originalServer.databasePath);
+  damagedDb.prepare("UPDATE prizes SET inventory_key = NULL").run();
+  damagedDb.prepare("DELETE FROM prize_inventory").run();
+  damagedDb.prepare("DELETE FROM global_prizes").run();
+  damagedDb.close();
+
+  const migratedServer = startTestServer({
+    mode: "all",
+    databasePath: originalServer.databasePath
+  });
+  t.after(migratedServer.close);
+
+  const secondDraw = await migratedServer.request("/api/public/draw", {
+    method: "POST",
+    body: JSON.stringify({ code: codes[1] })
+  });
+  assert.equal(secondDraw.status, 400);
+  assert.match(secondDraw.body.error, /inventory is sold out/i);
+});
+
+test("updating campaign settings without prizes preserves awarded inventory", async (t) => {
+  const server = startTestServer({ mode: "all" });
+  t.after(server.close);
+
+  await server.request("/api/admin/login", {
+    method: "POST",
+    body: JSON.stringify({ username: "admin", password: "admin" })
+  });
+
+  const created = await server.request("/api/admin/campaigns", {
+    method: "POST",
+    body: JSON.stringify({
+      code: "KEEPSTOCK",
+      max_uses: 2,
+      active: true,
+      prizes: [{ name: "Only One", probability: 100, stock: 1, image_url: "" }]
+    })
+  });
+  assert.equal(created.status, 201);
+
+  const firstDraw = await server.request("/api/public/draw", {
+    method: "POST",
+    body: JSON.stringify({ code: "KEEPSTOCK" })
+  });
+  assert.equal(firstDraw.status, 200);
+
+  const updated = await server.request(`/api/admin/campaigns/${created.body.campaign.id}`, {
+    method: "PUT",
+    body: JSON.stringify({ active: true, max_uses: 2 })
+  });
+  assert.equal(updated.status, 200);
+  assert.equal(updated.body.campaign.prizes[0].won_count, 1);
+
+  const secondDraw = await server.request("/api/public/draw", {
+    method: "POST",
+    body: JSON.stringify({ code: "KEEPSTOCK" })
+  });
+  assert.equal(secondDraw.status, 400);
+  assert.match(secondDraw.body.error, /inventory is sold out/i);
+});
+
+test("code generation returns a validation error when no drawable prizes exist", async (t) => {
+  const server = startTestServer({ mode: "all" });
+  t.after(server.close);
+
+  await server.request("/api/admin/login", {
+    method: "POST",
+    body: JSON.stringify({ username: "admin", password: "admin" })
+  });
+
+  const independent = await server.request("/api/admin/codes", {
+    method: "POST",
+    body: JSON.stringify({ max_uses: 1, active: true, prizes: [] })
+  });
+  assert.equal(independent.status, 400);
+  assert.match(independent.body.error, /positive probability/i);
+
+  const legacyBulk = await server.request("/api/admin/codes/bulk", {
+    method: "POST",
+    body: JSON.stringify({ quantity: 1, max_uses: 1, active: true })
+  });
+  assert.equal(legacyBulk.status, 400);
+  assert.match(legacyBulk.body.error, /positive probability/i);
+});
+
+test("database migration creates indexes for campaign prize backfills", async (t) => {
+  const server = startTestServer({ mode: "all" });
+  t.after(server.close);
+
+  const db = new Database(server.databasePath, { readonly: true });
+  const indexes = db
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'index'")
+    .all()
+    .map((row) => row.name);
+  db.close();
+
+  assert.ok(indexes.includes("idx_prizes_campaign_id"));
+  assert.ok(indexes.includes("idx_draws_campaign_prize"));
 });
 
 test("legacy generated codes receive a fixed prize snapshot during migration", async (t) => {

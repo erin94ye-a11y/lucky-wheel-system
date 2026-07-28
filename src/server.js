@@ -50,7 +50,9 @@ export function createApp(options = {}) {
   const adminUser = options.adminUser || process.env.ADMIN_USER || "admin";
   const adminPassword = options.adminPassword || process.env.ADMIN_PASSWORD || "admin";
   const sessionSecret =
-    options.sessionSecret || process.env.SESSION_SECRET || "change-this-secret-in-production";
+    options.sessionSecret ||
+    process.env.SESSION_SECRET ||
+    crypto.randomBytes(32).toString("base64url");
 
   mkdirSync(uploadDir, { recursive: true });
   const db = openDatabase(databasePath);

@@ -1,4 +1,5 @@
 import Database from "better-sqlite3";
+import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
@@ -35,6 +36,7 @@ function migrate(db) {
       probability REAL NOT NULL,
       stock INTEGER,
       won_count INTEGER NOT NULL DEFAULT 0,
+      inventory_key TEXT,
       sort_order INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE
@@ -47,8 +49,17 @@ function migrate(db) {
       probability REAL NOT NULL,
       stock INTEGER,
       won_count INTEGER NOT NULL DEFAULT 0,
+      inventory_key TEXT,
       sort_order INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS prize_inventory (
+      inventory_key TEXT PRIMARY KEY,
+      stock INTEGER,
+      won_count INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
     CREATE TABLE IF NOT EXISTS draws (
@@ -80,7 +91,80 @@ function migrate(db) {
     );
   `);
 
+  ensureColumn(db, "prizes", "inventory_key", "TEXT");
+  ensureColumn(db, "global_prizes", "inventory_key", "TEXT");
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_prizes_campaign_id ON prizes(campaign_id);
+    CREATE INDEX IF NOT EXISTS idx_draws_campaign_prize ON draws(campaign_id, prize_id);
+    CREATE INDEX IF NOT EXISTS idx_prizes_inventory_key ON prizes(inventory_key);
+    CREATE INDEX IF NOT EXISTS idx_global_prizes_inventory_key ON global_prizes(inventory_key);
+  `);
+  backfillInventoryKeys(db);
   backfillCampaignPrizeSnapshots(db);
+}
+
+function ensureColumn(db, tableName, columnName, definition) {
+  const columns = db.prepare(`PRAGMA table_info(${tableName})`).all();
+  if (!columns.some((column) => column.name === columnName)) {
+    db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
+  }
+}
+
+function backfillInventoryKeys(db) {
+  db.prepare(`
+    UPDATE global_prizes
+    SET inventory_key = lower(hex(randomblob(16)))
+    WHERE inventory_key IS NULL OR trim(inventory_key) = ''
+  `).run();
+
+  for (const prize of db.prepare("SELECT * FROM global_prizes").all()) {
+    upsertInventory(db, prize.inventory_key, prize.stock, prize.won_count);
+  }
+
+  db.prepare(`
+    UPDATE prizes
+    SET inventory_key = (
+      SELECT global_prizes.inventory_key
+      FROM global_prizes
+      WHERE global_prizes.name = prizes.name
+        AND global_prizes.sort_order = prizes.sort_order
+      LIMIT 1
+    )
+    WHERE (inventory_key IS NULL OR trim(inventory_key) = '')
+      AND EXISTS (
+        SELECT 1
+        FROM global_prizes
+        WHERE global_prizes.name = prizes.name
+          AND global_prizes.sort_order = prizes.sort_order
+      )
+  `).run();
+
+  const unmatchedGroups = db.prepare(`
+    SELECT name, sort_order
+    FROM prizes
+    WHERE inventory_key IS NULL OR trim(inventory_key) = ''
+    GROUP BY name, sort_order
+  `).all();
+  const assignGroupInventory = db.prepare(`
+    UPDATE prizes
+    SET inventory_key = ?
+    WHERE (inventory_key IS NULL OR trim(inventory_key) = '')
+      AND name = ?
+      AND sort_order = ?
+  `);
+  for (const group of unmatchedGroups) {
+    assignGroupInventory.run(randomUUID(), group.name, group.sort_order);
+  }
+
+  db.prepare(`
+    INSERT INTO prize_inventory (inventory_key, stock, won_count)
+    SELECT inventory_key, MIN(stock), SUM(won_count)
+    FROM prizes
+    GROUP BY inventory_key
+    ON CONFLICT(inventory_key) DO UPDATE SET
+      won_count = MAX(prize_inventory.won_count, excluded.won_count),
+      updated_at = datetime('now')
+  `).run();
 }
 
 function backfillCampaignPrizeSnapshots(db) {
@@ -92,6 +176,7 @@ function backfillCampaignPrizeSnapshots(db) {
       probability,
       stock,
       won_count,
+      inventory_key,
       sort_order
     )
     SELECT
@@ -106,6 +191,7 @@ function backfillCampaignPrizeSnapshots(db) {
         WHERE draws.campaign_id = campaigns.id
           AND draws.prize_id = global_prizes.id
       ),
+      global_prizes.inventory_key,
       global_prizes.sort_order
     FROM campaigns
     CROSS JOIN global_prizes
@@ -187,16 +273,27 @@ export function generateCampaignCode(db) {
 }
 
 export function generateIndependentCampaignCode(db, input) {
+  const prizes = resolveGeneratedPrizes(db, input.prizes ?? [], { seedWhenEmpty: true });
   return saveCampaign(db, null, {
     ...input,
     code: null,
-    title: "Lucky Draw"
+    title: "Lucky Draw",
+    prizes
   });
 }
 
 export function listGlobalPrizes(db) {
   return db
-    .prepare("SELECT * FROM global_prizes ORDER BY sort_order ASC, id ASC")
+    .prepare(`
+      SELECT
+        global_prizes.*,
+        prize_inventory.stock AS inventory_stock,
+        prize_inventory.won_count AS inventory_won_count
+      FROM global_prizes
+      LEFT JOIN prize_inventory
+        ON prize_inventory.inventory_key = global_prizes.inventory_key
+      ORDER BY global_prizes.sort_order ASC, global_prizes.id ASC
+    `)
     .all()
     .map(serializeGlobalPrize);
 }
@@ -204,19 +301,43 @@ export function listGlobalPrizes(db) {
 export function replaceGlobalPrizes(db, input) {
   const transaction = db.transaction(() => {
     const prizes = normalizePrizeInput(input.prizes ?? []);
+    const existingPrizes = listGlobalPrizes(db);
+    const existingByKey = new Map(
+      existingPrizes.map((prize) => [prize.inventory_key, prize])
+    );
+    const existingByOrder = new Map(
+      existingPrizes.map((prize) => [prize.sort_order, prize])
+    );
     db.prepare("DELETE FROM global_prizes").run();
 
     const insertPrize = db.prepare(`
-      INSERT INTO global_prizes (name, image_url, probability, stock, sort_order)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO global_prizes (
+        name,
+        image_url,
+        probability,
+        stock,
+        inventory_key,
+        sort_order
+      )
+      VALUES (?, ?, ?, ?, ?, ?)
     `);
 
     for (const prize of prizes) {
+      let inventoryKey = prize.inventory_key;
+      if (inventoryKey && !existingByKey.has(inventoryKey)) {
+        const error = new Error("The prize template changed. Refresh the admin page and try again.");
+        error.statusCode = 400;
+        throw error;
+      }
+      inventoryKey =
+        inventoryKey || existingByOrder.get(prize.sort_order)?.inventory_key || randomUUID();
+      upsertInventory(db, inventoryKey, prize.stock);
       insertPrize.run(
         prize.name,
         prize.image_url,
         prize.probability,
         prize.stock,
+        inventoryKey,
         prize.sort_order
       );
     }
@@ -234,7 +355,7 @@ export function bulkGenerateCampaignCodes(db, input) {
     const maxUses = Number.parseInt(input.max_uses ?? 1, 10);
     const active = input.active === false || input.active === 0 || input.active === "0" ? 0 : 1;
     const expiresAt = input.expires_at ? String(input.expires_at) : null;
-    const prizes = input.prizes ?? listGlobalPrizes(db);
+    const prizes = resolveGeneratedPrizes(db, input.prizes ?? listGlobalPrizes(db));
 
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > 500) {
       const error = new Error("Quantity must be between 1 and 500.");
@@ -268,6 +389,64 @@ export function bulkGenerateCampaignCodes(db, input) {
   return transaction();
 }
 
+function resolveGeneratedPrizes(db, inputPrizes, options = {}) {
+  const submittedPrizes = normalizePrizeInput(inputPrizes);
+  let templatePrizes = listGlobalPrizes(db);
+
+  if (!templatePrizes.length && options.seedWhenEmpty) {
+    templatePrizes = replaceGlobalPrizes(db, { prizes: submittedPrizes });
+  }
+
+  const templateByKey = new Map(
+    templatePrizes.map((prize) => [prize.inventory_key, prize])
+  );
+  const resolvedPrizes = submittedPrizes.map((prize) => {
+    let templatePrize = null;
+    if (prize.inventory_key) {
+      templatePrize = templateByKey.get(prize.inventory_key) ?? null;
+      if (!templatePrize) {
+        const error = new Error("The prize template changed. Refresh the admin page and try again.");
+        error.statusCode = 400;
+        throw error;
+      }
+    } else {
+      templatePrize = templatePrizes.find(
+        (candidate) =>
+          candidate.sort_order === prize.sort_order && candidate.name === prize.name
+      ) ?? null;
+    }
+
+    if (!templatePrize) {
+      const error = new Error("Each generated code must use a prize from the saved template.");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    return {
+      name: templatePrize.name,
+      image_url: templatePrize.image_url,
+      probability: prize.probability,
+      stock: templatePrize.stock,
+      won_count: templatePrize.won_count,
+      inventory_key: templatePrize.inventory_key,
+      sort_order: templatePrize.sort_order
+    };
+  });
+
+  const hasAvailablePrize = resolvedPrizes.some(
+    (prize) =>
+      prize.probability > 0 &&
+      (prize.stock === null || prize.won_count < prize.stock)
+  );
+  if (!hasAvailablePrize) {
+    const error = new Error("At least one positive-probability prize must have available inventory.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return resolvedPrizes;
+}
+
 function saveCampaign(db, id, input) {
   const transaction = db.transaction(() => {
     const existing = id ? getCampaignById(db, id) : null;
@@ -280,9 +459,14 @@ function saveCampaign(db, id, input) {
     const code = ensureUniqueCode(db, input.code || existing?.code, id);
     const title = String(input.title ?? existing?.title ?? "Lucky Draw").trim() || "Lucky Draw";
     const maxUses = Number.parseInt(input.max_uses ?? existing?.max_uses ?? 1, 10);
-    const active = input.active === false || input.active === 0 || input.active === "0" ? 0 : 1;
-    const expiresAt = input.expires_at ? String(input.expires_at) : null;
-    const prizes = normalizePrizeInput(input.prizes ?? existing?.prizes ?? []);
+    const activeValue = input.active ?? existing?.active ?? true;
+    const active = activeValue === false || activeValue === 0 || activeValue === "0" ? 0 : 1;
+    const expiresValue = Object.hasOwn(input, "expires_at")
+      ? input.expires_at
+      : existing?.expires_at;
+    const expiresAt = expiresValue ? String(expiresValue) : null;
+    const shouldReplacePrizes = !id || Object.hasOwn(input, "prizes");
+    const prizes = shouldReplacePrizes ? normalizePrizeInput(input.prizes ?? []) : null;
 
     if (!Number.isInteger(maxUses) || maxUses <= 0) {
       const error = new Error("Max uses must be greater than 0.");
@@ -297,7 +481,9 @@ function saveCampaign(db, id, input) {
         SET code = ?, title = ?, max_uses = ?, active = ?, expires_at = ?, updated_at = datetime('now')
         WHERE id = ?
       `).run(code, title, maxUses, active, expiresAt, id);
-      db.prepare("DELETE FROM prizes WHERE campaign_id = ?").run(id);
+      if (shouldReplacePrizes) {
+        db.prepare("DELETE FROM prizes WHERE campaign_id = ?").run(id);
+      }
     } else {
       const result = db.prepare(`
         INSERT INTO campaigns (code, title, max_uses, active, expires_at)
@@ -306,7 +492,9 @@ function saveCampaign(db, id, input) {
       campaignId = Number(result.lastInsertRowid);
     }
 
-    insertCampaignPrizes(db, campaignId, prizes);
+    if (shouldReplacePrizes) {
+      insertCampaignPrizes(db, campaignId, prizes);
+    }
 
     return getCampaignById(db, campaignId);
   });
@@ -322,19 +510,41 @@ function replaceCampaignPrizes(db, campaignId, inputPrizes) {
 
 function insertCampaignPrizes(db, campaignId, prizes) {
   const insertPrize = db.prepare(`
-    INSERT INTO prizes (campaign_id, name, image_url, probability, stock, sort_order)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO prizes (
+      campaign_id,
+      name,
+      image_url,
+      probability,
+      stock,
+      inventory_key,
+      sort_order
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
   for (const prize of prizes) {
+    const inventoryKey = prize.inventory_key || randomUUID();
+    upsertInventory(db, inventoryKey, prize.stock, 0, false);
     insertPrize.run(
       campaignId,
       prize.name,
       prize.image_url,
       prize.probability,
       prize.stock,
+      inventoryKey,
       prize.sort_order
     );
   }
+}
+
+function upsertInventory(db, inventoryKey, stock, wonCount = 0, updateStock = true) {
+  db.prepare(`
+    INSERT INTO prize_inventory (inventory_key, stock, won_count)
+    VALUES (?, ?, ?)
+    ON CONFLICT(inventory_key) DO UPDATE SET
+      stock = CASE WHEN ? THEN excluded.stock ELSE prize_inventory.stock END,
+      won_count = MAX(prize_inventory.won_count, excluded.won_count),
+      updated_at = datetime('now')
+  `).run(inventoryKey, stock, Number(wonCount ?? 0), updateStock ? 1 : 0);
 }
 
 function ensureUniqueCode(db, requestedCode, campaignId = null) {
@@ -380,11 +590,18 @@ export function performDraw(db, code, requestMeta) {
       throw error;
     }
 
-    if (selectedPrize.pool === "global") {
-      db.prepare("UPDATE global_prizes SET won_count = won_count + 1 WHERE id = ?").run(selectedPrize.id);
-    } else {
-      db.prepare("UPDATE prizes SET won_count = won_count + 1 WHERE id = ?").run(selectedPrize.id);
+    const inventoryUpdate = db.prepare(`
+      UPDATE prize_inventory
+      SET won_count = won_count + 1, updated_at = datetime('now')
+      WHERE inventory_key = ?
+        AND (stock IS NULL OR won_count < stock)
+    `).run(selectedPrize.inventory_key);
+    if (inventoryUpdate.changes !== 1) {
+      const error = new Error("Prize inventory is sold out. Please contact the campaign administrator.");
+      error.statusCode = 400;
+      throw error;
     }
+    db.prepare("UPDATE prizes SET won_count = won_count + 1 WHERE id = ?").run(selectedPrize.id);
     db.prepare(`
       UPDATE campaigns
       SET used_count = used_count + 1, updated_at = datetime('now')
@@ -545,7 +762,17 @@ function getVisitByToken(db, visitorToken) {
 
 function listPrizes(db, campaignId) {
   return db
-    .prepare("SELECT * FROM prizes WHERE campaign_id = ? ORDER BY sort_order ASC, id ASC")
+    .prepare(`
+      SELECT
+        prizes.*,
+        prize_inventory.stock AS inventory_stock,
+        prize_inventory.won_count AS inventory_won_count
+      FROM prizes
+      LEFT JOIN prize_inventory
+        ON prize_inventory.inventory_key = prizes.inventory_key
+      WHERE prizes.campaign_id = ?
+      ORDER BY prizes.sort_order ASC, prizes.id ASC
+    `)
     .all(campaignId)
     .map(serializePrize);
 }
@@ -589,6 +816,9 @@ function serializeCampaign(campaign) {
 }
 
 function serializePrize(prize) {
+  const inventoryStock = Object.hasOwn(prize, "inventory_stock")
+    ? prize.inventory_stock
+    : prize.stock;
   return {
     id: Number(prize.id),
     campaign_id: Number(prize.campaign_id),
@@ -596,13 +826,17 @@ function serializePrize(prize) {
     name: prize.name,
     image_url: prize.image_url,
     probability: Number(prize.probability),
-    stock: prize.stock === null ? null : Number(prize.stock),
-    won_count: Number(prize.won_count),
+    stock: inventoryStock === null ? null : Number(inventoryStock),
+    won_count: Number(prize.inventory_won_count ?? prize.won_count),
+    inventory_key: prize.inventory_key,
     sort_order: Number(prize.sort_order)
   };
 }
 
 function serializeGlobalPrize(prize) {
+  const inventoryStock = Object.hasOwn(prize, "inventory_stock")
+    ? prize.inventory_stock
+    : prize.stock;
   return {
     id: Number(prize.id),
     campaign_id: null,
@@ -610,8 +844,9 @@ function serializeGlobalPrize(prize) {
     name: prize.name,
     image_url: prize.image_url,
     probability: Number(prize.probability),
-    stock: prize.stock === null ? null : Number(prize.stock),
-    won_count: Number(prize.won_count),
+    stock: inventoryStock === null ? null : Number(inventoryStock),
+    won_count: Number(prize.inventory_won_count ?? prize.won_count),
+    inventory_key: prize.inventory_key,
     sort_order: Number(prize.sort_order)
   };
 }

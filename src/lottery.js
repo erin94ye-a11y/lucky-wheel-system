@@ -13,7 +13,7 @@ export function generateCode(length = 8) {
 
 export function normalizePrizeInput(prizes) {
   if (!Array.isArray(prizes)) {
-    throw new Error("Prizes must be an array.");
+    throw validationError("Prizes must be an array.");
   }
 
   const normalized = prizes.map((prize, index) => {
@@ -22,17 +22,22 @@ export function normalizePrizeInput(prizes) {
     const rawStock = prize.stock === "" || prize.stock === undefined ? null : prize.stock;
     const stock = rawStock === null ? null : Number.parseInt(rawStock, 10);
     const imageUrl = String(prize.image_url ?? prize.imageUrl ?? "").trim();
+    const inventoryKey = String(prize.inventory_key ?? "").trim();
 
     if (!name) {
-      throw new Error(`Prize ${index + 1} needs a name.`);
+      throw validationError(`Prize ${index + 1} needs a name.`);
     }
 
     if (!Number.isFinite(probability) || probability < 0) {
-      throw new Error(`Prize ${name} needs a non-negative probability.`);
+      throw validationError(`Prize ${name} needs a non-negative probability.`);
     }
 
     if (stock !== null && (!Number.isInteger(stock) || stock < 0)) {
-      throw new Error(`Prize ${name} needs stock greater than or equal to 0.`);
+      throw validationError(`Prize ${name} needs stock greater than or equal to 0.`);
+    }
+
+    if (inventoryKey && !/^[A-Za-z0-9_-]{1,80}$/.test(inventoryKey)) {
+      throw validationError(`Prize ${name} has an invalid inventory key.`);
     }
 
     return {
@@ -40,15 +45,22 @@ export function normalizePrizeInput(prizes) {
       probability,
       stock,
       image_url: imageUrl,
+      inventory_key: inventoryKey || null,
       sort_order: Number.isInteger(prize.sort_order) ? prize.sort_order : index
     };
   });
 
   if (visiblePrizes(normalized).length === 0) {
-    throw new Error("At least one prize must have positive probability and available stock.");
+    throw validationError("At least one prize must have positive probability and available stock.");
   }
 
   return normalized;
+}
+
+function validationError(message) {
+  const error = new Error(message);
+  error.statusCode = 400;
+  return error;
 }
 
 export function visiblePrizes(prizes) {

@@ -307,6 +307,7 @@ function renderPrizeSettings(prizes, options = {}) {
 
 function addPrizeRow(prize) {
   const row = prizeRowTemplate.content.firstElementChild.cloneNode(true);
+  row.dataset.inventoryKey = prize.inventory_key ?? "";
   row.querySelector(".prize-name").value = prize.name ?? "";
   row.querySelector(".prize-probability").value = prize.probability ?? 10;
   row.querySelector(".prize-stock").value = prize.stock ?? "";
@@ -357,6 +358,7 @@ function readPrizeForm() {
     probability: Number(row.querySelector(".prize-probability").value),
     stock: row.querySelector(".prize-stock").value,
     image_url: row.querySelector(".prize-image").value,
+    inventory_key: row.dataset.inventoryKey || null,
     sort_order: index
   }));
 }
@@ -367,6 +369,7 @@ function renderCodeProbabilitySettings(prizes) {
     image_url: String(prize.image_url ?? ""),
     stock: prize.stock ?? "",
     probability: Number(prize.probability ?? 0),
+    inventory_key: String(prize.inventory_key ?? ""),
     sort_order: Number.isInteger(prize.sort_order) ? prize.sort_order : index
   }));
   codeProbabilityRows.innerHTML = "";
