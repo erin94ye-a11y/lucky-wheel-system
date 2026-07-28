@@ -1033,6 +1033,79 @@ body.public-page {
   padding-top: 16px;
 }
 
+.code-probability-editor {
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.code-probability-heading {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.code-probability-heading h3 {
+  color: var(--navy);
+  font-size: 15px;
+  margin: 0 0 3px;
+}
+
+.code-probability-heading p {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.code-probability-heading > span {
+  background: rgba(7, 143, 138, 0.1);
+  border: 1px solid rgba(7, 143, 138, 0.24);
+  border-radius: 999px;
+  color: #06736f;
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 5px 8px;
+}
+
+.code-probability-list {
+  display: grid;
+  gap: 8px;
+  max-height: 340px;
+  overflow: auto;
+  padding-right: 3px;
+}
+
+.code-probability-row {
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid !important;
+  gap: 10px !important;
+  grid-template-columns: minmax(0, 1fr) 92px;
+  padding: 8px 9px;
+}
+
+.code-probability-row span {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.code-probability-row input {
+  min-height: 38px;
+  padding: 8px 10px;
+  text-align: right;
+}
+
 .compact-title {
   margin-bottom: 10px;
 }
@@ -1098,6 +1171,30 @@ body.public-page {
 .code-delete-button:hover {
   background: rgba(226, 61, 87, 0.08);
   color: var(--accent-strong);
+}
+
+.delete-all-codes-button {
+  background: #fff;
+  border: 1px solid rgba(226, 61, 87, 0.52);
+  border-radius: 8px;
+  color: var(--accent-strong);
+  font-size: 13px;
+  min-height: 44px;
+  padding: 0 13px;
+  white-space: nowrap;
+}
+
+.delete-all-codes-button:hover:not(:disabled),
+.delete-all-codes-button:focus-visible {
+  background: var(--accent-strong);
+  color: #fff;
+}
+
+.delete-all-codes-button:disabled {
+  background: #f4f6f9;
+  border-color: var(--line);
+  color: #9aa6b6;
+  cursor: not-allowed;
 }
 
 .editor-panel {
@@ -1859,6 +1956,38 @@ body.admin-page {
 
 .admin-page .generated-code-panel {
   border-top-color: var(--admin-line);
+}
+
+.admin-page .code-probability-editor {
+  background: var(--admin-soft);
+  border-color: var(--admin-line);
+  border-radius: 12px;
+}
+
+.admin-page .code-probability-row {
+  border-color: var(--admin-line);
+  border-radius: 10px;
+}
+
+.admin-page .delete-all-codes-button {
+  background: #ffffff;
+  border: 1px solid rgba(232, 61, 90, 0.48);
+  border-radius: 10px;
+  box-shadow: none;
+  color: var(--admin-brand-strong);
+}
+
+.admin-page .delete-all-codes-button:hover:not(:disabled),
+.admin-page .delete-all-codes-button:focus-visible {
+  background: var(--admin-brand-strong);
+  color: #ffffff;
+}
+
+.admin-page .delete-all-codes-button:disabled {
+  background: #f4f6f9;
+  border-color: var(--admin-line);
+  box-shadow: none;
+  color: #9aa6b6;
 }
 
 .admin-page .prize-guide {

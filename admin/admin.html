@@ -43,17 +43,13 @@
       <div class="admin-grid">
         <section class="panel code-generator-panel">
           <div class="panel-title">
-            <h2>批量生成抽奖代码</h2>
+            <h2>生成独立抽奖代码</h2>
             <span id="codeState"></span>
           </div>
           <form id="codeGeneratorForm" class="campaign-form">
             <div class="form-grid">
               <label>
-                生成数量
-                <input id="quantityInput" type="number" min="1" max="500" value="1" required />
-              </label>
-              <label>
-                每个代码可抽次数
+                代码可抽次数
                 <input id="maxUsesInput" type="number" min="1" value="1" required />
               </label>
               <label>
@@ -65,8 +61,18 @@
               <input id="activeInput" type="checkbox" checked />
               <span>生成后立即启用</span>
             </label>
+            <section class="code-probability-editor" aria-labelledby="codeProbabilityTitle">
+              <div class="code-probability-heading">
+                <div>
+                  <h3 id="codeProbabilityTitle">当前代码中奖概率</h3>
+                  <p>本次设置只属于即将生成的代码</p>
+                </div>
+                <span>独立保存</span>
+              </div>
+              <div class="code-probability-list" id="codeProbabilityRows"></div>
+            </section>
             <div class="submit-row">
-              <button type="submit">生成代码</button>
+              <button type="submit">生成独立代码</button>
             </div>
           </form>
           <div class="generated-code-panel">
@@ -80,23 +86,23 @@
 
         <section class="panel editor-panel prize-settings-panel">
           <div class="panel-title">
-            <h2>统一奖品池设置</h2>
+            <h2>奖品模板设置</h2>
             <span id="prizeState"></span>
           </div>
           <form id="prizeForm" class="campaign-form">
             <div class="prize-toolbar">
-              <h3>奖品、图片、概率与库存</h3>
+              <h3>奖品、图片、默认概率与库存</h3>
               <button class="secondary" id="addPrizeButton" type="button">添加奖品</button>
             </div>
             <div class="prize-guide" aria-label="奖品字段说明">
               <p>奖品名称：转盘端显示的奖品文字</p>
-              <p>概率权重：数值越大越容易中奖，0 表示不会中奖</p>
+              <p>默认概率：用于新代码的初始值，不影响已生成代码</p>
               <p>库存：留空表示不限量，填 0 表示不可抽中</p>
               <p>图片：可填写图片地址或上传图片，保存后同步到转盘端</p>
             </div>
             <div class="prize-table" id="prizeRows"></div>
             <div class="submit-row">
-              <button type="submit">保存奖品池</button>
+              <button type="submit">保存奖品模板</button>
               <button class="secondary" id="resetPrizeButton" type="button">恢复默认示例</button>
             </div>
           </form>
@@ -105,7 +111,15 @@
         <aside class="panel campaign-list-panel">
           <div class="panel-title">
             <h2>已生成代码</h2>
-            <span id="codeCount"></span>
+            <div class="panel-actions code-list-actions">
+              <span id="codeCount"></span>
+              <button
+                class="delete-all-codes-button"
+                id="deleteAllCodesButton"
+                type="button"
+                disabled
+              >全部删除</button>
+            </div>
           </div>
           <div class="campaign-list" id="campaignList"></div>
         </aside>

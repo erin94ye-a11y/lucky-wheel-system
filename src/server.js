@@ -10,8 +10,10 @@ import sharp from "sharp";
 import {
   bulkGenerateCampaignCodes,
   createCampaign,
+  deleteAllCampaigns,
   deleteCampaign,
   generateCampaignCode,
+  generateIndependentCampaignCode,
   getCampaignByCode,
   listGlobalPrizes,
   listCampaigns,
@@ -137,6 +139,15 @@ export function createApp(options = {}) {
       }
     });
 
+    app.post("/api/admin/codes", requireAdmin(sessionSecret), (request, response, next) => {
+      try {
+        const campaign = generateIndependentCampaignCode(db, request.body ?? {});
+        response.status(201).json({ campaign });
+      } catch (error) {
+        next(error);
+      }
+    });
+
     app.get("/api/admin/prizes", requireAdmin(sessionSecret), (_request, response) => {
       response.json({ prizes: listGlobalPrizes(db) });
     });
@@ -156,6 +167,10 @@ export function createApp(options = {}) {
       } catch (error) {
         next(error);
       }
+    });
+
+    app.delete("/api/admin/campaigns", requireAdmin(sessionSecret), (_request, response) => {
+      response.json({ deleted_count: deleteAllCampaigns(db) });
     });
 
     app.put("/api/admin/campaigns/:id", requireAdmin(sessionSecret), (request, response, next) => {

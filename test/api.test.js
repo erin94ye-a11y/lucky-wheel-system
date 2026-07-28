@@ -4,14 +4,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
+import Database from "better-sqlite3";
 import sharp from "sharp";
 
 import { createApp } from "../src/server.js";
 
 function startTestServer(options = {}) {
   const workspace = mkdtempSync(join(tmpdir(), "lucky-wheel-"));
+  const databasePath = options.databasePath ?? join(workspace, "test.db");
   const app = createApp({
-    databasePath: join(workspace, "test.db"),
+    databasePath,
     uploadDir: join(workspace, "uploads"),
     sessionSecret: "test-secret",
     adminUser: "admin",
@@ -50,7 +52,7 @@ function startTestServer(options = {}) {
     return { status: response.status, body };
   }
 
-  return { request, baseUrl, close: () => server.close() };
+  return { request, baseUrl, databasePath, close: () => server.close() };
 }
 
 test("public mode does not expose admin login page or admin APIs", async (t) => {
@@ -271,7 +273,7 @@ test("public page keeps the code entry flow and removes the unused reward intro"
   assert.doesNotMatch(script.body, /campaignTitle\.textContent = campaign\.title/);
 });
 
-test("admin bulk code UI omits batch title and includes code deletion", async (t) => {
+test("admin independent code generator UI submits one prize snapshot", async (t) => {
   const server = startTestServer({ mode: "admin" });
   t.after(server.close);
 
@@ -281,16 +283,42 @@ test("admin bulk code UI omits batch title and includes code deletion", async (t
   assert.equal(adminPage.status, 200);
   assert.doesNotMatch(adminPage.body, /批次名称/);
   assert.doesNotMatch(adminPage.body, /codeTitleInput/);
-  assert.match(adminPage.body, /id="quantityInput"[^>]+value="1"/);
-  assert.doesNotMatch(adminPage.body, /id="quantityInput"[^>]+value="20"/);
+  assert.doesNotMatch(adminPage.body, /id="quantityInput"/);
+  assert.match(adminPage.body, /id="codeProbabilityRows"/);
+  assert.match(adminPage.body, /生成独立代码/);
 
   const adminScript = await server.request("/admin.js", {
     headers: { accept: "text/javascript" }
   });
   assert.equal(adminScript.status, 200);
   assert.doesNotMatch(adminScript.body, /codeTitleInput/);
+  assert.doesNotMatch(adminScript.body, /quantityInput/);
+  assert.doesNotMatch(adminScript.body, /\/api\/admin\/codes\/bulk/);
+  assert.match(adminScript.body, /api\("\/api\/admin\/codes"/);
+  assert.match(adminScript.body, /prizes: readCodeProbabilityForm\(\)/);
   assert.match(adminScript.body, /deleteCampaign/);
   assert.match(adminScript.body, /method: "DELETE"/);
+});
+
+test("admin generated-code list includes a confirmed delete-all control", async (t) => {
+  const server = startTestServer({ mode: "admin" });
+  t.after(server.close);
+
+  const adminPage = await server.request("/", {
+    headers: { accept: "text/html" }
+  });
+  assert.equal(adminPage.status, 200);
+  assert.match(adminPage.body, /id="deleteAllCodesButton"/);
+  assert.match(adminPage.body, /全部删除/);
+
+  const adminScript = await server.request("/admin.js", {
+    headers: { accept: "text/javascript" }
+  });
+  assert.equal(adminScript.status, 200);
+  assert.match(adminScript.body, /deleteAllCodesButton\.disabled = campaigns\.length === 0/);
+  assert.match(adminScript.body, /async function deleteAllCampaigns\(\)/);
+  assert.match(adminScript.body, /确认删除全部/);
+  assert.match(adminScript.body, /api\("\/api\/admin\/campaigns", \{\s*method: "DELETE"/);
 });
 
 test("admin prize pool UI explains each prize field", async (t) => {
@@ -303,7 +331,7 @@ test("admin prize pool UI explains each prize field", async (t) => {
   assert.equal(adminPage.status, 200);
   assert.match(adminPage.body, /class="prize-guide"/);
   assert.match(adminPage.body, /奖品名称：转盘端显示的奖品文字/);
-  assert.match(adminPage.body, /概率权重：数值越大越容易中奖，0 表示不会中奖/);
+  assert.match(adminPage.body, /默认概率：用于新代码的初始值，不影响已生成代码/);
   assert.match(adminPage.body, /库存：留空表示不限量，填 0 表示不可抽中/);
   assert.match(adminPage.body, /图片：可填写图片地址或上传图片，保存后同步到转盘端/);
 });
@@ -488,7 +516,112 @@ test("admin manages one global prize pool and bulk-generates reusable codes", as
   }
 });
 
-test("generated codes draw from the latest global prize probabilities", async (t) => {
+test("admin generates one independent code with its submitted prize snapshot", async (t) => {
+  const server = startTestServer({ mode: "all" });
+  t.after(server.close);
+
+  const denied = await server.request("/api/admin/codes", {
+    method: "POST",
+    body: JSON.stringify({ prizes: [] })
+  });
+  assert.equal(denied.status, 401);
+
+  await server.request("/api/admin/login", {
+    method: "POST",
+    body: JSON.stringify({ username: "admin", password: "admin" })
+  });
+
+  const generated = await server.request("/api/admin/codes", {
+    method: "POST",
+    body: JSON.stringify({
+      max_uses: 1,
+      active: true,
+      prizes: [
+        { name: "Prize A", probability: 100, stock: null, image_url: "" },
+        { name: "Prize B", probability: 0, stock: null, image_url: "" }
+      ]
+    })
+  });
+  assert.equal(generated.status, 201);
+  assert.match(generated.body.campaign.code, /^[A-Z0-9]{8}$/);
+  assert.deepEqual(
+    generated.body.campaign.prizes.map(({ name, probability }) => ({ name, probability })),
+    [
+      { name: "Prize A", probability: 100 },
+      { name: "Prize B", probability: 0 }
+    ]
+  );
+
+  const publicView = await server.request(
+    `/api/public/campaigns/${generated.body.campaign.code}`
+  );
+  assert.equal(publicView.status, 200);
+  assert.deepEqual(publicView.body.prizes.map((prize) => prize.name), ["Prize A", "Prize B"]);
+  assert.ok(publicView.body.prizes.every((prize) => prize.probability === undefined));
+});
+
+test("admin can delete all generated codes while preserving access records", async (t) => {
+  const server = startTestServer({ mode: "all" });
+  t.after(server.close);
+
+  const denied = await server.request("/api/admin/campaigns", { method: "DELETE" });
+  assert.equal(denied.status, 401);
+
+  await server.request("/api/admin/login", {
+    method: "POST",
+    body: JSON.stringify({ username: "admin", password: "admin" })
+  });
+
+  const generatedCodes = [];
+  for (const winningPrize of ["Prize A", "Prize B"]) {
+    const generated = await server.request("/api/admin/codes", {
+      method: "POST",
+      body: JSON.stringify({
+        max_uses: 1,
+        active: true,
+        prizes: [
+          {
+            name: winningPrize,
+            probability: 100,
+            stock: null,
+            image_url: ""
+          }
+        ]
+      })
+    });
+    assert.equal(generated.status, 201);
+    generatedCodes.push(generated.body.campaign.code);
+  }
+
+  const visit = await server.request("/api/public/visits", {
+    method: "POST",
+    body: JSON.stringify({
+      visitor_token: "delete-all-visitor",
+      code: generatedCodes[0],
+      device_model: "Test Device",
+      device_type: "Desktop",
+      system: "Test OS",
+      language: "en-US"
+    })
+  });
+  assert.equal(visit.status, 201);
+
+  const deleted = await server.request("/api/admin/campaigns", { method: "DELETE" });
+  assert.equal(deleted.status, 200);
+  assert.equal(deleted.body.deleted_count, 2);
+
+  const campaigns = await server.request("/api/admin/campaigns");
+  assert.deepEqual(campaigns.body.campaigns, []);
+
+  const visits = await server.request("/api/admin/visits");
+  assert.equal(visits.body.visits.length, 1);
+  assert.equal(visits.body.visits[0].code, generatedCodes[0]);
+
+  const publicView = await server.request(`/api/public/campaigns/${generatedCodes[0]}`);
+  assert.equal(publicView.status, 404);
+});
+
+test("legacy bulk-generated codes snapshot the current global prize probabilities", async (t) => {
   const server = startTestServer({ mode: "all" });
   t.after(server.close);
 
@@ -545,10 +678,140 @@ test("generated codes draw from the latest global prize probabilities", async (t
       body: JSON.stringify({ code })
     });
     assert.equal(draw.status, 200);
-    assert.equal(draw.body.prize.name, "Latest Probability Prize");
+    assert.equal(draw.body.prize.name, "Old Probability Prize");
   } finally {
     Math.random = originalRandom;
   }
+});
+
+test("generated codes keep independent prize probabilities", async (t) => {
+  const server = startTestServer({ mode: "all" });
+  t.after(server.close);
+
+  await server.request("/api/admin/login", {
+    method: "POST",
+    body: JSON.stringify({ username: "admin", password: "admin" })
+  });
+
+  await server.request("/api/admin/prizes", {
+    method: "PUT",
+    body: JSON.stringify({
+      prizes: [
+        { name: "Template Prize", probability: 100, stock: null, image_url: "" }
+      ]
+    })
+  });
+
+  const codeA = await server.request("/api/admin/campaigns", {
+    method: "POST",
+    body: JSON.stringify({
+      code: "CODEA2026",
+      max_uses: 1,
+      active: true,
+      prizes: [
+        { name: "Prize A", probability: 100, stock: null, image_url: "" },
+        { name: "Prize B", probability: 0, stock: null, image_url: "" }
+      ]
+    })
+  });
+  assert.equal(codeA.status, 201);
+
+  const codeB = await server.request("/api/admin/campaigns", {
+    method: "POST",
+    body: JSON.stringify({
+      code: "CODEB2026",
+      max_uses: 1,
+      active: true,
+      prizes: [
+        { name: "Prize A", probability: 0, stock: null, image_url: "" },
+        { name: "Prize B", probability: 100, stock: null, image_url: "" }
+      ]
+    })
+  });
+  assert.equal(codeB.status, 201);
+
+  await server.request("/api/admin/prizes", {
+    method: "PUT",
+    body: JSON.stringify({
+      prizes: [
+        { name: "Changed Template", probability: 100, stock: null, image_url: "" }
+      ]
+    })
+  });
+
+  const viewA = await server.request("/api/public/campaigns/CODEA2026");
+  const viewB = await server.request("/api/public/campaigns/CODEB2026");
+  assert.equal(viewA.status, 200);
+  assert.equal(viewB.status, 200);
+  assert.deepEqual(viewA.body.prizes.map((prize) => prize.name), ["Prize A", "Prize B"]);
+  assert.deepEqual(viewB.body.prizes.map((prize) => prize.name), ["Prize A", "Prize B"]);
+  assert.ok(viewA.body.prizes.every((prize) => prize.probability === undefined));
+  assert.ok(viewB.body.prizes.every((prize) => prize.probability === undefined));
+
+  const drawA = await server.request("/api/public/draw", {
+    method: "POST",
+    body: JSON.stringify({ code: "CODEA2026" })
+  });
+  const drawB = await server.request("/api/public/draw", {
+    method: "POST",
+    body: JSON.stringify({ code: "CODEB2026" })
+  });
+  assert.equal(drawA.status, 200);
+  assert.equal(drawB.status, 200);
+  assert.equal(drawA.body.prize.name, "Prize A");
+  assert.equal(drawB.body.prize.name, "Prize B");
+});
+
+test("legacy generated codes receive a fixed prize snapshot during migration", async (t) => {
+  const originalServer = startTestServer({ mode: "all" });
+  t.after(originalServer.close);
+
+  await originalServer.request("/api/admin/login", {
+    method: "POST",
+    body: JSON.stringify({ username: "admin", password: "admin" })
+  });
+  await originalServer.request("/api/admin/prizes", {
+    method: "PUT",
+    body: JSON.stringify({
+      prizes: [
+        { name: "Legacy Prize", probability: 100, stock: null, image_url: "" }
+      ]
+    })
+  });
+  const legacyCode = await originalServer.request("/api/admin/codes/bulk", {
+    method: "POST",
+    body: JSON.stringify({ quantity: 1, max_uses: 1, active: true })
+  });
+  assert.equal(legacyCode.status, 201);
+  const legacyCampaign = legacyCode.body.campaigns[0];
+  const code = legacyCampaign.code;
+
+  const legacyDb = new Database(originalServer.databasePath);
+  legacyDb.prepare("DELETE FROM prizes WHERE campaign_id = ?").run(legacyCampaign.id);
+  legacyDb.close();
+
+  const migratedServer = startTestServer({
+    mode: "all",
+    databasePath: originalServer.databasePath
+  });
+  t.after(migratedServer.close);
+  await migratedServer.request("/api/admin/login", {
+    method: "POST",
+    body: JSON.stringify({ username: "admin", password: "admin" })
+  });
+
+  await migratedServer.request("/api/admin/prizes", {
+    method: "PUT",
+    body: JSON.stringify({
+      prizes: [
+        { name: "Changed Template", probability: 100, stock: null, image_url: "" }
+      ]
+    })
+  });
+
+  const publicView = await migratedServer.request(`/api/public/campaigns/${code}`);
+  assert.equal(publicView.status, 200);
+  assert.deepEqual(publicView.body.prizes.map((prize) => prize.name), ["Legacy Prize"]);
 });
 
 test("admin upload creates wheel-sized images and public APIs normalize upload URLs", async (t) => {
@@ -858,16 +1121,16 @@ test("admin can delete a generated lottery code", async (t) => {
     body: JSON.stringify({ username: "admin", password: "admin" })
   });
 
-  const generated = await server.request("/api/admin/codes/bulk", {
+  const generated = await server.request("/api/admin/codes", {
     method: "POST",
     body: JSON.stringify({
-      quantity: 1,
       max_uses: 1,
-      active: true
+      active: true,
+      prizes: [{ name: "Delete Me", probability: 100, stock: null, image_url: "" }]
     })
   });
   assert.equal(generated.status, 201);
-  const campaign = generated.body.campaigns[0];
+  const campaign = generated.body.campaign;
 
   const deleted = await server.request(`/api/admin/campaigns/${campaign.id}`, {
     method: "DELETE"

@@ -79,6 +79,42 @@ function migrate(db) {
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
+
+  backfillCampaignPrizeSnapshots(db);
+}
+
+function backfillCampaignPrizeSnapshots(db) {
+  return db.prepare(`
+    INSERT INTO prizes (
+      campaign_id,
+      name,
+      image_url,
+      probability,
+      stock,
+      won_count,
+      sort_order
+    )
+    SELECT
+      campaigns.id,
+      global_prizes.name,
+      global_prizes.image_url,
+      global_prizes.probability,
+      global_prizes.stock,
+      (
+        SELECT COUNT(*)
+        FROM draws
+        WHERE draws.campaign_id = campaigns.id
+          AND draws.prize_id = global_prizes.id
+      ),
+      global_prizes.sort_order
+    FROM campaigns
+    CROSS JOIN global_prizes
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM prizes
+      WHERE prizes.campaign_id = campaigns.id
+    )
+  `).run().changes;
 }
 
 export function listCampaigns(db) {
@@ -141,8 +177,21 @@ export function deleteCampaign(db, id) {
   return campaign;
 }
 
+export function deleteAllCampaigns(db) {
+  const transaction = db.transaction(() => db.prepare("DELETE FROM campaigns").run().changes);
+  return transaction();
+}
+
 export function generateCampaignCode(db) {
   return ensureUniqueCode(db, null);
+}
+
+export function generateIndependentCampaignCode(db, input) {
+  return saveCampaign(db, null, {
+    ...input,
+    code: null,
+    title: "Lucky Draw"
+  });
 }
 
 export function listGlobalPrizes(db) {
@@ -185,6 +234,7 @@ export function bulkGenerateCampaignCodes(db, input) {
     const maxUses = Number.parseInt(input.max_uses ?? 1, 10);
     const active = input.active === false || input.active === 0 || input.active === "0" ? 0 : 1;
     const expiresAt = input.expires_at ? String(input.expires_at) : null;
+    const prizes = input.prizes ?? listGlobalPrizes(db);
 
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > 500) {
       const error = new Error("Quantity must be between 1 and 500.");
@@ -207,7 +257,9 @@ export function bulkGenerateCampaignCodes(db, input) {
     for (let index = 0; index < quantity; index += 1) {
       const code = ensureUniqueCode(db, null);
       const result = insertCampaign.run(code, title, maxUses, active, expiresAt);
-      created.push(getCampaignById(db, Number(result.lastInsertRowid)));
+      const campaignId = Number(result.lastInsertRowid);
+      replaceCampaignPrizes(db, campaignId, prizes);
+      created.push(getCampaignById(db, campaignId));
     }
 
     return created;
@@ -254,25 +306,35 @@ function saveCampaign(db, id, input) {
       campaignId = Number(result.lastInsertRowid);
     }
 
-    const insertPrize = db.prepare(`
-      INSERT INTO prizes (campaign_id, name, image_url, probability, stock, sort_order)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `);
-    for (const prize of prizes) {
-      insertPrize.run(
-        campaignId,
-        prize.name,
-        prize.image_url,
-        prize.probability,
-        prize.stock,
-        prize.sort_order
-      );
-    }
+    insertCampaignPrizes(db, campaignId, prizes);
 
     return getCampaignById(db, campaignId);
   });
 
   return transaction();
+}
+
+function replaceCampaignPrizes(db, campaignId, inputPrizes) {
+  const prizes = normalizePrizeInput(inputPrizes ?? []);
+  db.prepare("DELETE FROM prizes WHERE campaign_id = ?").run(campaignId);
+  insertCampaignPrizes(db, campaignId, prizes);
+}
+
+function insertCampaignPrizes(db, campaignId, prizes) {
+  const insertPrize = db.prepare(`
+    INSERT INTO prizes (campaign_id, name, image_url, probability, stock, sort_order)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+  for (const prize of prizes) {
+    insertPrize.run(
+      campaignId,
+      prize.name,
+      prize.image_url,
+      prize.probability,
+      prize.stock,
+      prize.sort_order
+    );
+  }
 }
 
 function ensureUniqueCode(db, requestedCode, campaignId = null) {
@@ -489,11 +551,6 @@ function listPrizes(db, campaignId) {
 }
 
 function listDrawablePrizesForCampaign(db, campaignId) {
-  const globalPrizes = listGlobalPrizes(db);
-  if (globalPrizes.length > 0) {
-    return globalPrizes;
-  }
-
   return listPrizes(db, campaignId);
 }
 

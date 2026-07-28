@@ -6,12 +6,13 @@ const logoutButton = document.querySelector("#logoutButton");
 const refreshButton = document.querySelector("#refreshButton");
 const campaignList = document.querySelector("#campaignList");
 const codeCount = document.querySelector("#codeCount");
+const deleteAllCodesButton = document.querySelector("#deleteAllCodesButton");
 const codeGeneratorForm = document.querySelector("#codeGeneratorForm");
-const quantityInput = document.querySelector("#quantityInput");
 const maxUsesInput = document.querySelector("#maxUsesInput");
 const expiresInput = document.querySelector("#expiresInput");
 const activeInput = document.querySelector("#activeInput");
 const codeState = document.querySelector("#codeState");
+const codeProbabilityRows = document.querySelector("#codeProbabilityRows");
 const generatedCodes = document.querySelector("#generatedCodes");
 const generatedCount = document.querySelector("#generatedCount");
 const prizeForm = document.querySelector("#prizeForm");
@@ -31,6 +32,9 @@ let prizesLoaded = false;
 let adminSyncTimer = null;
 let prizeFormDirty = false;
 let latestPrizeSignature = "";
+let codePrizeTemplate = [];
+let codeProbabilityLoaded = false;
+let codeProbabilityDirty = false;
 
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -64,18 +68,29 @@ refreshButton.addEventListener("click", () => refreshAll({ forcePrizes: true }))
 exportVisitsButton.addEventListener("click", () => {
   window.location.href = "/api/admin/visits/export";
 });
+deleteAllCodesButton.addEventListener("click", deleteAllCampaigns);
 
 codeGeneratorForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  const prizes = readCodeProbabilityForm();
+  if (!prizes.length) {
+    setState(codeState, "请先保存奖品模板。", "error");
+    return;
+  }
+  if (!prizes.some((prize) => prize.probability > 0)) {
+    setState(codeState, "至少一个奖品的概率必须大于 0。", "error");
+    return;
+  }
+
   setState(codeState, "正在生成代码...", "muted");
 
-  const response = await api("/api/admin/codes/bulk", {
+  const response = await api("/api/admin/codes", {
     method: "POST",
     body: {
-      quantity: Number(quantityInput.value),
       max_uses: Number(maxUsesInput.value),
       expires_at: expiresInput.value ? new Date(expiresInput.value).toISOString() : null,
-      active: activeInput.checked
+      active: activeInput.checked,
+      prizes: readCodeProbabilityForm()
     }
   });
 
@@ -84,14 +99,14 @@ codeGeneratorForm.addEventListener("submit", async (event) => {
     return;
   }
 
-  setState(codeState, `已生成 ${response.campaigns.length} 个代码`, "success");
-  renderGeneratedCodes(response.campaigns);
-  await refreshAll({ forcePrizes: true });
+  setState(codeState, `已生成独立代码 ${response.campaign.code}`, "success");
+  renderGeneratedCodes([response.campaign]);
+  await refreshAll();
 });
 
 prizeForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  setState(prizeState, "正在保存奖品池...", "muted");
+  setState(prizeState, "正在保存奖品模板...", "muted");
 
   const response = await api("/api/admin/prizes", {
     method: "PUT",
@@ -99,12 +114,13 @@ prizeForm.addEventListener("submit", async (event) => {
   });
 
   if (!response.ok) {
-    setState(prizeState, response.error || "奖品池保存失败", "error");
+    setState(prizeState, response.error || "奖品模板保存失败", "error");
     return;
   }
 
-  setState(prizeState, "奖品池已保存", "success");
+  setState(prizeState, "奖品模板已保存", "success");
   renderPrizeSettings(response.prizes);
+  renderCodeProbabilitySettings(response.prizes);
 });
 
 addPrizeButton.addEventListener("click", () => {
@@ -173,8 +189,14 @@ async function refreshAll(options = {}) {
       renderPrizeSettings(serverPrizes);
       prizesLoaded = true;
       if (options.silent && prizesChanged) {
-        setState(prizeState, "已同步最新奖品池", "success");
+        setState(prizeState, "已同步最新奖品模板", "success");
       }
+    }
+    if (
+      !codeProbabilityLoaded ||
+      (!codeProbabilityDirty && (options.forcePrizes || prizesChanged))
+    ) {
+      renderCodeProbabilitySettings(serverPrizes);
     }
   }
 
@@ -185,6 +207,7 @@ async function refreshAll(options = {}) {
 
 function renderCampaignList() {
   codeCount.textContent = `${campaigns.length} 个`;
+  deleteAllCodesButton.disabled = campaigns.length === 0;
   campaignList.innerHTML = "";
   if (!campaigns.length) {
     campaignList.innerHTML = `<p class="privacy-note">还没有生成抽奖代码。</p>`;
@@ -242,6 +265,31 @@ async function deleteCampaign(campaign) {
   }
 
   setState(codeState, `已删除代码 ${campaign.code}`, "success");
+  await refreshAll();
+}
+
+async function deleteAllCampaigns() {
+  const count = campaigns.length;
+  if (!count) {
+    return;
+  }
+  if (!window.confirm(`确认删除全部 ${count} 个代码？此操作无法撤销。`)) {
+    return;
+  }
+
+  setState(codeState, "正在删除全部代码...", "muted");
+  const response = await api("/api/admin/campaigns", {
+    method: "DELETE"
+  });
+
+  if (!response.ok) {
+    setState(codeState, response.error || "全部代码删除失败", "error");
+    return;
+  }
+
+  generatedCodes.innerHTML = "";
+  generatedCount.textContent = "";
+  setState(codeState, `已删除 ${response.deleted_count} 个代码`, "success");
   await refreshAll();
 }
 
@@ -311,6 +359,54 @@ function readPrizeForm() {
     image_url: row.querySelector(".prize-image").value,
     sort_order: index
   }));
+}
+
+function renderCodeProbabilitySettings(prizes) {
+  codePrizeTemplate = prizes.map((prize, index) => ({
+    name: String(prize.name ?? ""),
+    image_url: String(prize.image_url ?? ""),
+    stock: prize.stock ?? "",
+    probability: Number(prize.probability ?? 0),
+    sort_order: Number.isInteger(prize.sort_order) ? prize.sort_order : index
+  }));
+  codeProbabilityRows.innerHTML = "";
+
+  for (const [index, prize] of codePrizeTemplate.entries()) {
+    const row = document.createElement("label");
+    row.className = "code-probability-row";
+
+    const name = document.createElement("span");
+    name.textContent = prize.name;
+
+    const input = document.createElement("input");
+    input.className = "code-probability-input";
+    input.type = "number";
+    input.min = "0";
+    input.step = "0.01";
+    input.value = String(prize.probability);
+    input.dataset.prizeIndex = String(index);
+    input.setAttribute("aria-label", `${prize.name} 当前代码中奖概率`);
+    input.required = true;
+    input.addEventListener("input", () => {
+      codeProbabilityDirty = true;
+    });
+
+    row.append(name, input);
+    codeProbabilityRows.append(row);
+  }
+
+  codeProbabilityLoaded = true;
+  codeProbabilityDirty = false;
+}
+
+function readCodeProbabilityForm() {
+  return codePrizeTemplate.map((prize, index) => {
+    const input = codeProbabilityRows.querySelector(`[data-prize-index="${index}"]`);
+    return {
+      ...prize,
+      probability: Number(input?.value ?? 0)
+    };
+  });
 }
 
 function prizeListSignature(prizes) {
