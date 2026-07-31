@@ -330,4 +330,3 @@ If verification required changes, stage only files in this feature and commit:
 git add admin/admin.html admin/admin.js public/styles.css src/db.js src/server.js test/api.test.js
 git commit -m "fix: complete independent code workflow"
 ```
-

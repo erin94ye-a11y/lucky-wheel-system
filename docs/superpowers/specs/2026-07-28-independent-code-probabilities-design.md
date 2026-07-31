@@ -79,4 +79,3 @@ The bulk-delete endpoint requires an authenticated admin session and returns the
 - Verify bulk delete requires admin authentication, deletes all campaigns atomically, cascades campaign prizes and draws, and preserves access records.
 - Verify the bulk-delete button is disabled for an empty list and uses a count-aware confirmation.
 - Run the complete API and lottery test suites.
-
