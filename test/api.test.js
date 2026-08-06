@@ -274,7 +274,7 @@ test("public page keeps the code entry flow and removes the unused reward intro"
   assert.doesNotMatch(script.body, /campaignTitle\.textContent = campaign\.title/);
 });
 
-test("admin independent code generator UI submits one prize snapshot", async (t) => {
+test("admin code generator UI supports single and 20-code prize snapshots", async (t) => {
   const server = startTestServer({ mode: "admin" });
   t.after(server.close);
 
@@ -287,6 +287,8 @@ test("admin independent code generator UI submits one prize snapshot", async (t)
   assert.doesNotMatch(adminPage.body, /id="quantityInput"/);
   assert.match(adminPage.body, /id="codeProbabilityRows"/);
   assert.match(adminPage.body, /生成独立代码/);
+  assert.match(adminPage.body, /id="batchGenerateButton"/);
+  assert.match(adminPage.body, /批量生成20个代码/);
 
   const adminScript = await server.request("/admin.js", {
     headers: { accept: "text/javascript" }
@@ -294,9 +296,12 @@ test("admin independent code generator UI submits one prize snapshot", async (t)
   assert.equal(adminScript.status, 200);
   assert.doesNotMatch(adminScript.body, /codeTitleInput/);
   assert.doesNotMatch(adminScript.body, /quantityInput/);
-  assert.doesNotMatch(adminScript.body, /\/api\/admin\/codes\/bulk/);
-  assert.match(adminScript.body, /api\("\/api\/admin\/codes"/);
+  assert.match(adminScript.body, /\/api\/admin\/codes\/bulk/);
+  assert.match(adminScript.body, /quantity: 20/);
+  assert.match(adminScript.body, /"\/api\/admin\/codes"/);
   assert.match(adminScript.body, /prizes: readCodeProbabilityForm\(\)/);
+  assert.match(adminScript.body, /const createdCampaigns = isBatch \? response\.campaigns/);
+  assert.match(adminScript.body, /renderGeneratedCodes\(createdCampaigns\)/);
   assert.match(adminScript.body, /inventory_key: String\(prize\.inventory_key \?\? ""\)/);
   assert.match(adminScript.body, /deleteCampaign/);
   assert.match(adminScript.body, /method: "DELETE"/);
@@ -498,14 +503,14 @@ test("admin manages one global prize pool and bulk-generates reusable codes", as
   const generated = await server.request("/api/admin/codes/bulk", {
     method: "POST",
     body: JSON.stringify({
-      quantity: 3,
+      quantity: 20,
       max_uses: 1,
       active: true
     })
   });
   assert.equal(generated.status, 201);
-  assert.equal(generated.body.campaigns.length, 3);
-  assert.equal(new Set(generated.body.campaigns.map((campaign) => campaign.code)).size, 3);
+  assert.equal(generated.body.campaigns.length, 20);
+  assert.equal(new Set(generated.body.campaigns.map((campaign) => campaign.code)).size, 20);
 
   const code = generated.body.campaigns[0].code;
   const publicView = await server.request(`/api/public/campaigns/${code}`);
@@ -534,6 +539,48 @@ test("admin manages one global prize pool and bulk-generates reusable codes", as
   } finally {
     Math.random = originalRandom;
   }
+});
+
+test("first bulk generation seeds the visible prize template and creates 20 independent codes", async (t) => {
+  const server = startTestServer({ mode: "all" });
+  t.after(server.close);
+
+  await server.request("/api/admin/login", {
+    method: "POST",
+    body: JSON.stringify({ username: "admin", password: "admin" })
+  });
+
+  const generated = await server.request("/api/admin/codes/bulk", {
+    method: "POST",
+    body: JSON.stringify({
+      quantity: 20,
+      max_uses: 1,
+      active: true,
+      prizes: [
+        { name: "Prize A", probability: 0, stock: null, image_url: "" },
+        { name: "Prize B", probability: 2, stock: null, image_url: "" }
+      ]
+    })
+  });
+
+  assert.equal(generated.status, 201);
+  assert.equal(generated.body.campaigns.length, 20);
+  assert.equal(new Set(generated.body.campaigns.map((campaign) => campaign.code)).size, 20);
+  assert.ok(
+    generated.body.campaigns.every(
+      (campaign) =>
+        campaign.prizes[0].name === "Prize A" &&
+        campaign.prizes[0].probability === 0 &&
+        campaign.prizes[1].name === "Prize B" &&
+        campaign.prizes[1].probability === 2
+    )
+  );
+
+  const savedPrizes = await server.request("/api/admin/prizes");
+  assert.deepEqual(
+    savedPrizes.body.prizes.map((prize) => [prize.name, prize.probability]),
+    [["Prize A", 0], ["Prize B", 2]]
+  );
 });
 
 test("admin generates one independent code with its submitted prize snapshot", async (t) => {

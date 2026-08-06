@@ -355,7 +355,9 @@ export function bulkGenerateCampaignCodes(db, input) {
     const maxUses = Number.parseInt(input.max_uses ?? 1, 10);
     const active = input.active === false || input.active === 0 || input.active === "0" ? 0 : 1;
     const expiresAt = input.expires_at ? String(input.expires_at) : null;
-    const prizes = resolveGeneratedPrizes(db, input.prizes ?? listGlobalPrizes(db));
+    const prizes = resolveGeneratedPrizes(db, input.prizes ?? listGlobalPrizes(db), {
+      seedWhenEmpty: true
+    });
 
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > 500) {
       const error = new Error("Quantity must be between 1 and 500.");

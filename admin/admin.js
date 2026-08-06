@@ -8,6 +8,8 @@ const campaignList = document.querySelector("#campaignList");
 const codeCount = document.querySelector("#codeCount");
 const deleteAllCodesButton = document.querySelector("#deleteAllCodesButton");
 const codeGeneratorForm = document.querySelector("#codeGeneratorForm");
+const singleGenerateButton = document.querySelector("#singleGenerateButton");
+const batchGenerateButton = document.querySelector("#batchGenerateButton");
 const maxUsesInput = document.querySelector("#maxUsesInput");
 const expiresInput = document.querySelector("#expiresInput");
 const activeInput = document.querySelector("#activeInput");
@@ -72,6 +74,17 @@ deleteAllCodesButton.addEventListener("click", deleteAllCampaigns);
 
 codeGeneratorForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  await generateCodes(1);
+});
+
+batchGenerateButton.addEventListener("click", async () => {
+  if (!codeGeneratorForm.reportValidity()) {
+    return;
+  }
+  await generateCodes(20);
+});
+
+async function generateCodes(quantity) {
   const prizes = readCodeProbabilityForm();
   if (!prizes.length) {
     setState(codeState, "请先保存奖品模板。", "error");
@@ -82,27 +95,58 @@ codeGeneratorForm.addEventListener("submit", async (event) => {
     return;
   }
 
-  setState(codeState, "正在生成代码...", "muted");
+  const isBatch = quantity > 1;
+  setGenerationButtonsDisabled(true);
+  setState(codeState, isBatch ? "正在批量生成20个代码..." : "正在生成代码...", "muted");
 
-  const response = await api("/api/admin/codes", {
-    method: "POST",
-    body: {
-      max_uses: Number(maxUsesInput.value),
-      expires_at: expiresInput.value ? new Date(expiresInput.value).toISOString() : null,
-      active: activeInput.checked,
-      prizes: readCodeProbabilityForm()
+  try {
+    const response = await api(isBatch ? "/api/admin/codes/bulk" : "/api/admin/codes", {
+      method: "POST",
+      body: {
+        ...(isBatch ? { quantity: 20 } : {}),
+        max_uses: Number(maxUsesInput.value),
+        expires_at: expiresInput.value ? new Date(expiresInput.value).toISOString() : null,
+        active: activeInput.checked,
+        prizes: readCodeProbabilityForm()
+      }
+    });
+
+    if (!response.ok) {
+      setState(codeState, response.error || "代码生成失败", "error");
+      return;
     }
-  });
 
-  if (!response.ok) {
-    setState(codeState, response.error || "代码生成失败", "error");
-    return;
+    const createdCampaigns = isBatch ? response.campaigns : [response.campaign];
+    if (!createdCampaigns?.length) {
+      setState(codeState, "服务器没有返回新代码，请重试。", "error");
+      return;
+    }
+
+    const createdIds = new Set(createdCampaigns.map((campaign) => campaign.id));
+    campaigns = [
+      ...createdCampaigns.slice().reverse(),
+      ...campaigns.filter((campaign) => !createdIds.has(campaign.id))
+    ];
+    setState(
+      codeState,
+      isBatch
+        ? `已批量生成 ${createdCampaigns.length} 个独立代码`
+        : `已生成独立代码 ${createdCampaigns[0].code}`,
+      "success"
+    );
+    renderGeneratedCodes(createdCampaigns);
+    renderCampaignList();
+  } catch (error) {
+    setState(codeState, error.message || "代码生成失败，请重试。", "error");
+  } finally {
+    setGenerationButtonsDisabled(false);
   }
+}
 
-  setState(codeState, `已生成独立代码 ${response.campaign.code}`, "success");
-  renderGeneratedCodes([response.campaign]);
-  await refreshAll();
-});
+function setGenerationButtonsDisabled(disabled) {
+  singleGenerateButton.disabled = disabled;
+  batchGenerateButton.disabled = disabled;
+}
 
 prizeForm.addEventListener("submit", async (event) => {
   event.preventDefault();
