@@ -355,10 +355,9 @@ test("admin access log UI replaces draw logs and includes an xlsx export button"
   assert.doesNotMatch(adminPage.body, /参与记录/);
   assert.match(adminPage.body, /id="exportVisitsButton"/);
   assert.match(adminPage.body, /导出XLSX/);
-  for (const heading of ["时间", "代码", "IP地址", "设备型号", "设备类型", "系统", "使用语言"]) {
+  for (const heading of ["时间", "代码", "中奖奖品", "IP地址", "设备型号", "设备类型", "系统", "使用语言"]) {
     assert.match(adminPage.body, new RegExp(heading));
   }
-  assert.doesNotMatch(adminPage.body, /<th>奖品<\/th>/);
 
   const adminScript = await server.request("/admin.js", {
     headers: { accept: "text/javascript" }
@@ -367,6 +366,7 @@ test("admin access log UI replaces draw logs and includes an xlsx export button"
   assert.match(adminScript.body, /exportVisitsButton/);
   assert.match(adminScript.body, /renderVisits/);
   assert.match(adminScript.body, /\/api\/admin\/visits\/export/);
+  assert.match(adminScript.body, /visit\.prize_name/);
   assert.doesNotMatch(adminScript.body, /renderDraws/);
 });
 
@@ -1096,6 +1096,48 @@ test("database migration creates indexes for campaign prize backfills", async (t
   assert.ok(indexes.includes("idx_draws_campaign_prize"));
 });
 
+test("existing visit databases gain the winning prize field during migration", async (t) => {
+  const workspace = mkdtempSync(join(tmpdir(), "lucky-wheel-legacy-visits-"));
+  const databasePath = join(workspace, "legacy.db");
+  const legacyDb = new Database(databasePath);
+  legacyDb.exec(`
+    CREATE TABLE visits (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      visitor_token TEXT NOT NULL UNIQUE,
+      code TEXT,
+      ip TEXT,
+      forwarded_for TEXT,
+      user_agent TEXT,
+      device_model TEXT,
+      device_type TEXT,
+      system TEXT,
+      language TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    INSERT INTO visits (visitor_token, code, ip)
+    VALUES ('legacy-visitor', 'LEGACY01', '192.0.2.44');
+  `);
+  legacyDb.close();
+
+  const server = startTestServer({ mode: "all", databasePath });
+  t.after(server.close);
+  await server.request("/api/admin/login", {
+    method: "POST",
+    body: JSON.stringify({ username: "admin", password: "admin" })
+  });
+
+  const visits = await server.request("/api/admin/visits");
+  assert.equal(visits.status, 200);
+  assert.equal(visits.body.visits[0].code, "LEGACY01");
+  assert.equal(visits.body.visits[0].prize_name, "");
+
+  const migratedDb = new Database(databasePath, { readonly: true });
+  const columns = migratedDb.prepare("PRAGMA table_info(visits)").all();
+  migratedDb.close();
+  assert.ok(columns.some((column) => column.name === "prize_name"));
+});
+
 test("legacy generated codes receive a fixed prize snapshot during migration", async (t) => {
   const originalServer = startTestServer({ mode: "all" });
   t.after(originalServer.close);
@@ -1317,6 +1359,7 @@ test("admin sees visitor access records with code, IP, device, system, and langu
   assert.equal(logs.status, 200);
   assert.equal(logs.body.visits.length, 1);
   assert.equal(logs.body.visits[0].code, "TEST2026");
+  assert.equal(logs.body.visits[0].prize_name, "Phone");
   assert.equal(logs.body.visits[0].ip_address, "203.0.113.10");
   assert.equal(logs.body.visits[0].device_model, "iPhone 15 Pro");
   assert.equal(logs.body.visits[0].device_type, "Mobile");
@@ -1426,6 +1469,20 @@ test("admin can export visitor access records as an xlsx spreadsheet", async (t)
   });
   assert.equal(visit.status, 201);
 
+  const draw = await server.request("/api/public/draw", {
+    method: "POST",
+    body: JSON.stringify({
+      code: "EXPORT26",
+      visitor_token: visit.body.visitor_token,
+      device_model: "Pixel 9",
+      device_type: "Mobile",
+      system: "Android 15",
+      language: "fr-FR"
+    })
+  });
+  assert.equal(draw.status, 200);
+  assert.equal(draw.body.prize.name, "Phone");
+
   const exported = await server.request("/api/admin/visits/export", { raw: true });
   assert.equal(exported.status, 200);
   assert.equal(
@@ -1439,6 +1496,8 @@ test("admin can export visitor access records as an xlsx spreadsheet", async (t)
   assert.equal(exported.body.subarray(0, 2).toString("utf8"), "PK");
   const workbookText = exported.body.toString("utf8");
   assert.match(workbookText, /EXPORT26/);
+  assert.match(workbookText, /中奖奖品/);
+  assert.match(workbookText, /Phone/);
   assert.match(workbookText, /198\.51\.100\.24/);
   assert.match(workbookText, /Pixel 9/);
   assert.match(workbookText, /Mobile/);

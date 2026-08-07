@@ -277,10 +277,13 @@ export function createApp(options = {}) {
           forwardedFor: request.get("x-forwarded-for") ?? "",
           userAgent: request.get("user-agent") ?? ""
         });
-        const visit = recordVisit(db, createVisitInput(request, {
-          ...(request.body ?? {}),
-          code: result.campaign.code
-        }));
+        const visit = recordVisit(db, {
+          ...createVisitInput(request, {
+            ...(request.body ?? {}),
+            code: result.campaign.code
+          }),
+          prize_name: result.prize.name
+        });
 
         response.json({
           prize: {

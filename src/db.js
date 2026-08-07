@@ -79,6 +79,7 @@ function migrate(db) {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       visitor_token TEXT NOT NULL UNIQUE,
       code TEXT,
+      prize_name TEXT,
       ip TEXT,
       forwarded_for TEXT,
       user_agent TEXT,
@@ -93,6 +94,7 @@ function migrate(db) {
 
   ensureColumn(db, "prizes", "inventory_key", "TEXT");
   ensureColumn(db, "global_prizes", "inventory_key", "TEXT");
+  ensureColumn(db, "visits", "prize_name", "TEXT");
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_prizes_campaign_id ON prizes(campaign_id);
     CREATE INDEX IF NOT EXISTS idx_draws_campaign_prize ON draws(campaign_id, prize_id);
@@ -101,6 +103,7 @@ function migrate(db) {
   `);
   backfillInventoryKeys(db);
   backfillCampaignPrizeSnapshots(db);
+  backfillVisitPrizeNames(db);
 }
 
 function ensureColumn(db, tableName, columnName, definition) {
@@ -108,6 +111,26 @@ function ensureColumn(db, tableName, columnName, definition) {
   if (!columns.some((column) => column.name === columnName)) {
     db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
   }
+}
+
+function backfillVisitPrizeNames(db) {
+  db.exec(`
+    UPDATE visits
+    SET prize_name = (
+      SELECT draws.prize_name
+      FROM draws
+      WHERE draws.code = visits.code
+      ORDER BY draws.created_at DESC, draws.id DESC
+      LIMIT 1
+    )
+    WHERE prize_name IS NULL
+      AND code IS NOT NULL
+      AND (
+        SELECT COUNT(*)
+        FROM draws
+        WHERE draws.code = visits.code
+      ) = 1
+  `);
 }
 
 function backfillInventoryKeys(db) {
@@ -685,6 +708,7 @@ export function recordVisit(db, input = {}) {
   const visit = {
     visitor_token: visitorToken,
     code: emptyToNull(sanitizeCode(input.code)),
+    prize_name: emptyToNull(limitText(input.prize_name, 240)),
     ip: emptyToNull(limitText(input.ip, 120)),
     forwarded_for: emptyToNull(limitText(input.forwarded_for, 240)),
     user_agent: emptyToNull(limitText(input.user_agent, 600)),
@@ -698,6 +722,7 @@ export function recordVisit(db, input = {}) {
     INSERT INTO visits (
       visitor_token,
       code,
+      prize_name,
       ip,
       forwarded_for,
       user_agent,
@@ -709,6 +734,7 @@ export function recordVisit(db, input = {}) {
     VALUES (
       @visitor_token,
       @code,
+      @prize_name,
       @ip,
       @forwarded_for,
       @user_agent,
@@ -718,6 +744,11 @@ export function recordVisit(db, input = {}) {
       @language
     )
     ON CONFLICT(visitor_token) DO UPDATE SET
+      prize_name = CASE
+        WHEN excluded.prize_name IS NOT NULL THEN excluded.prize_name
+        WHEN excluded.code IS NOT NULL AND excluded.code <> visits.code THEN NULL
+        ELSE visits.prize_name
+      END,
       code = COALESCE(excluded.code, visits.code),
       ip = COALESCE(excluded.ip, visits.ip),
       forwarded_for = COALESCE(excluded.forwarded_for, visits.forwarded_for),
@@ -873,6 +904,7 @@ function serializeVisit(visit) {
     id: Number(visit.id),
     visitor_token: visit.visitor_token,
     code: visit.code || "",
+    prize_name: visit.prize_name || "",
     ip: visit.ip || "",
     forwarded_for: visit.forwarded_for || "",
     ip_address: visit.forwarded_for || visit.ip || "",

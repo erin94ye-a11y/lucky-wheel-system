@@ -19,10 +19,11 @@ export function createDrawsWorkbook(draws) {
 
 export function createVisitsWorkbook(visits) {
   const rows = [
-    ["时间", "代码", "IP地址", "设备型号", "设备类型", "系统", "使用语言"],
+    ["时间", "代码", "中奖奖品", "IP地址", "设备型号", "设备类型", "系统", "使用语言"],
     ...visits.map((visit) => [
       visit.created_at,
       visit.code || "",
+      visit.prize_name || "",
       visit.ip_address || visit.forwarded_for || visit.ip || "",
       visit.device_model || "",
       visit.device_type || "",
