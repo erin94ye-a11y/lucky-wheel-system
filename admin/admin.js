@@ -478,6 +478,7 @@ function renderVisits(visits) {
           <td>${escapeHtml(visit.code || "")}</td>
           <td>${escapeHtml(visit.prize_name || "")}</td>
           <td>${escapeHtml(visit.ip_address || "")}</td>
+          <td>${escapeHtml(visit.location || "")}</td>
           <td>${escapeHtml(visit.device_model || "")}</td>
           <td>${escapeHtml(visit.device_type || "")}</td>
           <td>${escapeHtml(visit.system || "")}</td>

@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { isIP } from "node:net";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { mkdirSync } from "node:fs";
@@ -273,7 +274,7 @@ export function createApp(options = {}) {
     app.post("/api/public/draw", (request, response, next) => {
       try {
         const result = performDraw(db, sanitizeCode(request.body?.code), {
-          ip: request.ip,
+          ip: clientIp(request),
           forwardedFor: request.get("x-forwarded-for") ?? "",
           userAgent: request.get("user-agent") ?? ""
         });
@@ -318,14 +319,42 @@ function createVisitInput(request, input = {}) {
   return {
     visitor_token: input.visitor_token || crypto.randomUUID(),
     code: input.code,
-    ip: request.ip,
+    ip: clientIp(request),
     forwarded_for: request.get("x-forwarded-for") ?? "",
+    location: networkLocation(request),
     user_agent: request.get("user-agent") ?? "",
     device_model: input.device_model,
     device_type: input.device_type,
     system: input.system,
     language: input.language || normalizedLanguageHeader(request.get("accept-language"))
   };
+}
+
+function clientIp(request) {
+  return firstValidIp(request.get("cf-connecting-ip"))
+    || firstValidIp(request.get("x-forwarded-for"))
+    || firstValidIp(request.ip);
+}
+
+function firstValidIp(value) {
+  for (const item of String(value ?? "").split(",")) {
+    const candidate = item.trim().replace(/^::ffff:/, "");
+    if (isIP(candidate)) {
+      return candidate;
+    }
+  }
+  return "";
+}
+
+function networkLocation(request) {
+  const parts = [
+    request.get("cf-ipcity"),
+    request.get("cf-region"),
+    request.get("cf-ipcountry")
+  ]
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean);
+  return [...new Set(parts)].join(", ");
 }
 
 function normalizedLanguageHeader(value) {

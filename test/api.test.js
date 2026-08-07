@@ -355,7 +355,7 @@ test("admin access log UI replaces draw logs and includes an xlsx export button"
   assert.doesNotMatch(adminPage.body, /参与记录/);
   assert.match(adminPage.body, /id="exportVisitsButton"/);
   assert.match(adminPage.body, /导出XLSX/);
-  for (const heading of ["时间", "代码", "中奖奖品", "IP地址", "设备型号", "设备类型", "系统", "使用语言"]) {
+  for (const heading of ["时间", "代码", "中奖奖品", "IP地址", "网络位置", "设备型号", "设备类型", "系统", "使用语言"]) {
     assert.match(adminPage.body, new RegExp(heading));
   }
 
@@ -1096,7 +1096,7 @@ test("database migration creates indexes for campaign prize backfills", async (t
   assert.ok(indexes.includes("idx_draws_campaign_prize"));
 });
 
-test("existing visit databases gain the winning prize field during migration", async (t) => {
+test("existing visit databases gain prize and network location fields during migration", async (t) => {
   const workspace = mkdtempSync(join(tmpdir(), "lucky-wheel-legacy-visits-"));
   const databasePath = join(workspace, "legacy.db");
   const legacyDb = new Database(databasePath);
@@ -1131,11 +1131,13 @@ test("existing visit databases gain the winning prize field during migration", a
   assert.equal(visits.status, 200);
   assert.equal(visits.body.visits[0].code, "LEGACY01");
   assert.equal(visits.body.visits[0].prize_name, "");
+  assert.equal(visits.body.visits[0].location, "");
 
   const migratedDb = new Database(databasePath, { readonly: true });
   const columns = migratedDb.prepare("PRAGMA table_info(visits)").all();
   migratedDb.close();
   assert.ok(columns.some((column) => column.name === "prize_name"));
+  assert.ok(columns.some((column) => column.name === "location"));
 });
 
 test("legacy generated codes receive a fixed prize snapshot during migration", async (t) => {
@@ -1330,7 +1332,11 @@ test("admin sees visitor access records with code, IP, device, system, and langu
   const visit = await server.request("/api/public/visits", {
     method: "POST",
     headers: {
-      "x-forwarded-for": "203.0.113.10",
+      "cf-connecting-ip": "203.0.113.10",
+      "x-forwarded-for": "172.68.164.143, 203.0.113.10",
+      "cf-ipcity": "Miami",
+      "cf-region": "Florida",
+      "cf-ipcountry": "US",
       "user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)",
       "accept-language": "en-US,en;q=0.9"
     },
@@ -1348,7 +1354,11 @@ test("admin sees visitor access records with code, IP, device, system, and langu
   const draw = await server.request("/api/public/draw", {
     method: "POST",
     headers: {
-      "x-forwarded-for": "203.0.113.10"
+      "cf-connecting-ip": "203.0.113.10",
+      "x-forwarded-for": "172.68.164.143, 203.0.113.10",
+      "cf-ipcity": "Miami",
+      "cf-region": "Florida",
+      "cf-ipcountry": "US"
     },
     body: JSON.stringify({ code: "TEST2026", visitor_token: visit.body.visitor_token })
   });
@@ -1361,6 +1371,7 @@ test("admin sees visitor access records with code, IP, device, system, and langu
   assert.equal(logs.body.visits[0].code, "TEST2026");
   assert.equal(logs.body.visits[0].prize_name, "Phone");
   assert.equal(logs.body.visits[0].ip_address, "203.0.113.10");
+  assert.equal(logs.body.visits[0].location, "Miami, Florida, US");
   assert.equal(logs.body.visits[0].device_model, "iPhone 15 Pro");
   assert.equal(logs.body.visits[0].device_type, "Mobile");
   assert.equal(logs.body.visits[0].system, "iOS 18");
@@ -1455,7 +1466,11 @@ test("admin can export visitor access records as an xlsx spreadsheet", async (t)
   const visit = await server.request("/api/public/visits", {
     method: "POST",
     headers: {
-      "x-forwarded-for": "198.51.100.24",
+      "cf-connecting-ip": "198.51.100.24",
+      "x-forwarded-for": "172.68.164.143, 198.51.100.24",
+      "cf-ipcity": "Paris",
+      "cf-region": "Ile-de-France",
+      "cf-ipcountry": "FR",
       "user-agent": "Export Test Browser",
       "accept-language": "fr-FR,fr;q=0.9"
     },
@@ -1471,6 +1486,13 @@ test("admin can export visitor access records as an xlsx spreadsheet", async (t)
 
   const draw = await server.request("/api/public/draw", {
     method: "POST",
+    headers: {
+      "cf-connecting-ip": "198.51.100.24",
+      "x-forwarded-for": "172.68.164.143, 198.51.100.24",
+      "cf-ipcity": "Paris",
+      "cf-region": "Ile-de-France",
+      "cf-ipcountry": "FR"
+    },
     body: JSON.stringify({
       code: "EXPORT26",
       visitor_token: visit.body.visitor_token,
@@ -1499,6 +1521,8 @@ test("admin can export visitor access records as an xlsx spreadsheet", async (t)
   assert.match(workbookText, /中奖奖品/);
   assert.match(workbookText, /Phone/);
   assert.match(workbookText, /198\.51\.100\.24/);
+  assert.doesNotMatch(workbookText, /172\.68\.164\.143/);
+  assert.match(workbookText, /Paris, Ile-de-France, FR/);
   assert.match(workbookText, /Pixel 9/);
   assert.match(workbookText, /Mobile/);
   assert.match(workbookText, /Android 15/);

@@ -1,4 +1,5 @@
 import Database from "better-sqlite3";
+import { isIP } from "node:net";
 import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
@@ -80,6 +81,7 @@ function migrate(db) {
       visitor_token TEXT NOT NULL UNIQUE,
       code TEXT,
       prize_name TEXT,
+      location TEXT,
       ip TEXT,
       forwarded_for TEXT,
       user_agent TEXT,
@@ -95,6 +97,7 @@ function migrate(db) {
   ensureColumn(db, "prizes", "inventory_key", "TEXT");
   ensureColumn(db, "global_prizes", "inventory_key", "TEXT");
   ensureColumn(db, "visits", "prize_name", "TEXT");
+  const addedVisitLocation = ensureColumn(db, "visits", "location", "TEXT");
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_prizes_campaign_id ON prizes(campaign_id);
     CREATE INDEX IF NOT EXISTS idx_draws_campaign_prize ON draws(campaign_id, prize_id);
@@ -104,13 +107,35 @@ function migrate(db) {
   backfillInventoryKeys(db);
   backfillCampaignPrizeSnapshots(db);
   backfillVisitPrizeNames(db);
+  if (addedVisitLocation) {
+    backfillLegacyVisitIps(db);
+  }
 }
 
 function ensureColumn(db, tableName, columnName, definition) {
   const columns = db.prepare(`PRAGMA table_info(${tableName})`).all();
   if (!columns.some((column) => column.name === columnName)) {
     db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
+    return true;
   }
+  return false;
+}
+
+function backfillLegacyVisitIps(db) {
+  const update = db.prepare("UPDATE visits SET ip = ? WHERE id = ?");
+  const rows = db.prepare("SELECT id, forwarded_for FROM visits WHERE forwarded_for IS NOT NULL").all();
+  const transaction = db.transaction(() => {
+    for (const row of rows) {
+      const candidates = String(row.forwarded_for)
+        .split(",")
+        .map((value) => value.trim().replace(/^::ffff:/, ""))
+        .filter((value) => isIP(value));
+      if (candidates.length) {
+        update.run(candidates.at(-1), row.id);
+      }
+    }
+  });
+  transaction();
 }
 
 function backfillVisitPrizeNames(db) {
@@ -709,6 +734,7 @@ export function recordVisit(db, input = {}) {
     visitor_token: visitorToken,
     code: emptyToNull(sanitizeCode(input.code)),
     prize_name: emptyToNull(limitText(input.prize_name, 240)),
+    location: emptyToNull(limitText(input.location, 240)),
     ip: emptyToNull(limitText(input.ip, 120)),
     forwarded_for: emptyToNull(limitText(input.forwarded_for, 240)),
     user_agent: emptyToNull(limitText(input.user_agent, 600)),
@@ -723,6 +749,7 @@ export function recordVisit(db, input = {}) {
       visitor_token,
       code,
       prize_name,
+      location,
       ip,
       forwarded_for,
       user_agent,
@@ -735,6 +762,7 @@ export function recordVisit(db, input = {}) {
       @visitor_token,
       @code,
       @prize_name,
+      @location,
       @ip,
       @forwarded_for,
       @user_agent,
@@ -750,6 +778,7 @@ export function recordVisit(db, input = {}) {
         ELSE visits.prize_name
       END,
       code = COALESCE(excluded.code, visits.code),
+      location = COALESCE(excluded.location, visits.location),
       ip = COALESCE(excluded.ip, visits.ip),
       forwarded_for = COALESCE(excluded.forwarded_for, visits.forwarded_for),
       user_agent = COALESCE(excluded.user_agent, visits.user_agent),
@@ -905,9 +934,10 @@ function serializeVisit(visit) {
     visitor_token: visit.visitor_token,
     code: visit.code || "",
     prize_name: visit.prize_name || "",
+    location: visit.location || "",
     ip: visit.ip || "",
     forwarded_for: visit.forwarded_for || "",
-    ip_address: visit.forwarded_for || visit.ip || "",
+    ip_address: visit.ip || "",
     user_agent: visit.user_agent || "",
     device_model: visit.device_model || "",
     device_type: visit.device_type || "",
