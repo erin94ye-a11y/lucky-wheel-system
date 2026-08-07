@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { isIP } from "node:net";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 
 import express from "express";
 import multer from "multer";
@@ -37,6 +37,14 @@ const projectRoot = join(__dirname, "..");
 const COOKIE_NAME = "lucky_admin";
 const PRIZE_IMAGE_SIZE = 192;
 
+function setNoStoreHeaders(response) {
+  response.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  response.setHeader("CDN-Cache-Control", "no-store");
+  response.setHeader("Cloudflare-CDN-Cache-Control", "no-store");
+  response.setHeader("Pragma", "no-cache");
+  response.setHeader("Expires", "0");
+}
+
 export function createApp(options = {}) {
   const app = express();
   const databasePath =
@@ -54,6 +62,21 @@ export function createApp(options = {}) {
     options.sessionSecret ||
     process.env.SESSION_SECRET ||
     crypto.randomBytes(32).toString("base64url");
+
+  const adminAssetVersion = adminEnabled
+    ? crypto
+        .createHash("sha256")
+        .update(readFileSync(join(adminDir, "admin.js")))
+        .update(readFileSync(join(publicDir, "styles.css")))
+        .digest("hex")
+        .slice(0, 12)
+    : "";
+  const adminHtml = adminEnabled
+    ? readFileSync(join(adminDir, "admin.html"), "utf8").replaceAll(
+        "__ADMIN_ASSET_VERSION__",
+        adminAssetVersion
+      )
+    : "";
 
   mkdirSync(uploadDir, { recursive: true });
   const db = openDatabase(databasePath);
@@ -74,7 +97,10 @@ export function createApp(options = {}) {
   app.set("trust proxy", true);
   app.use(express.json({ limit: "1mb" }));
   app.use("/uploads", express.static(uploadDir));
-  app.get("/styles.css", (_request, response) => {
+  app.get("/styles.css", (request, response) => {
+    if (request.query.v) {
+      setNoStoreHeaders(response);
+    }
     response.sendFile(join(publicDir, "styles.css"));
   });
   for (const iconFile of ["favicon.png", "favicon-32.png", "favicon.ico", "apple-touch-icon.png"]) {
@@ -88,12 +114,23 @@ export function createApp(options = {}) {
   }
 
   if (adminEnabled) {
+    app.get("/admin.html", (_request, response) => {
+      setNoStoreHeaders(response);
+      response.type("html").send(adminHtml);
+    });
     if (!publicEnabled) {
       app.get("/", (_request, response) => {
-        response.sendFile(join(adminDir, "admin.html"));
+        setNoStoreHeaders(response);
+        response.type("html").send(adminHtml);
       });
     }
-    app.use(express.static(adminDir));
+    app.use(
+      express.static(adminDir, {
+        etag: false,
+        lastModified: false,
+        setHeaders: setNoStoreHeaders
+      })
+    );
   }
 
   app.get("/health", (_request, response) => {

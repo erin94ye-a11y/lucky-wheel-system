@@ -50,7 +50,7 @@ function startTestServer(options = {}) {
     } catch {
       body = text;
     }
-    return { status: response.status, body };
+    return { status: response.status, body, headers: response.headers };
   }
 
   return { request, baseUrl, databasePath, close: () => server.close() };
@@ -351,6 +351,10 @@ test("admin access log UI replaces draw logs and includes an xlsx export button"
     headers: { accept: "text/html" }
   });
   assert.equal(adminPage.status, 200);
+  assert.match(adminPage.headers.get("cache-control") || "", /no-store/);
+  assert.match(adminPage.body, /\/admin\.js\?v=[a-f0-9]{12}/);
+  assert.match(adminPage.body, /\/styles\.css\?v=[a-f0-9]{12}/);
+  assert.doesNotMatch(adminPage.body, /__ADMIN_ASSET_VERSION__/);
   assert.match(adminPage.body, /访问记录/);
   assert.doesNotMatch(adminPage.body, /参与记录/);
   assert.match(adminPage.body, /id="exportVisitsButton"/);
@@ -359,15 +363,27 @@ test("admin access log UI replaces draw logs and includes an xlsx export button"
     assert.match(adminPage.body, new RegExp(heading));
   }
 
-  const adminScript = await server.request("/admin.js", {
+  const adminScript = await server.request("/admin.js?v=cache-busting-test", {
     headers: { accept: "text/javascript" }
   });
   assert.equal(adminScript.status, 200);
+  assert.match(adminScript.headers.get("cache-control") || "", /no-store/);
   assert.match(adminScript.body, /exportVisitsButton/);
   assert.match(adminScript.body, /renderVisits/);
   assert.match(adminScript.body, /\/api\/admin\/visits\/export/);
   assert.match(adminScript.body, /visit\.prize_name/);
+  assert.match(adminScript.body, /visit\.location/);
   assert.doesNotMatch(adminScript.body, /renderDraws/);
+
+  const renderVisitsBlock = adminScript.body.slice(
+    adminScript.body.indexOf("function renderVisits"),
+    adminScript.body.indexOf("async function api")
+  );
+  assert.equal((renderVisitsBlock.match(/<td>/g) || []).length, 9);
+  assert.match(
+    renderVisitsBlock,
+    /visit\.ip_address[\s\S]*visit\.location[\s\S]*visit\.device_model[\s\S]*visit\.device_type[\s\S]*visit\.system[\s\S]*visit\.language/
+  );
 });
 
 test("admin default prize examples use investor rewards with blank stock", async (t) => {
@@ -1431,6 +1447,7 @@ test("admin visit records only include reports with entered codes", async (t) =>
   assert.equal(logs.body.visits.length, 1);
   assert.equal(logs.body.visits[0].code, "ENTERED99");
   assert.equal(logs.body.visits[0].ip_address, "192.0.2.12");
+  assert.equal(logs.body.visits[0].location, "");
   assert.equal(logs.body.visits[0].device_model, "Mac");
 
   const exported = await server.request("/api/admin/visits/export", { raw: true });
