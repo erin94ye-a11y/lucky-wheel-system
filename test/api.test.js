@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -8,7 +8,7 @@ import test from "node:test";
 import Database from "better-sqlite3";
 import sharp from "sharp";
 
-import { createApp } from "../src/server.js";
+import { createApp, resolveAppMode } from "../src/server.js";
 
 function startTestServer(options = {}) {
   const workspace = mkdtempSync(join(tmpdir(), "lucky-wheel-"));
@@ -55,6 +55,18 @@ function startTestServer(options = {}) {
 
   return { request, baseUrl, databasePath, close: () => server.close() };
 }
+
+test("Render deployments expose public and admin routes by default", () => {
+  assert.equal(resolveAppMode(undefined, { RENDER: "true" }), "all");
+  assert.equal(resolveAppMode(undefined, {}), "public");
+  assert.equal(resolveAppMode(undefined, { RENDER: "true", APP_MODE: "public" }), "public");
+  assert.equal(resolveAppMode("admin", { RENDER: "true" }), "admin");
+
+  const renderConfig = readFileSync(new URL("../render.yaml", import.meta.url), "utf8");
+  assert.match(renderConfig, /healthCheckPath:\s*\/health/);
+  assert.match(renderConfig, /key:\s*APP_MODE\s+[\s\S]*?value:\s*all/);
+  assert.match(renderConfig, /key:\s*SESSION_SECRET\s+[\s\S]*?generateValue:\s*true/);
+});
 
 test("public mode does not expose admin login page or admin APIs", async (t) => {
   const server = startTestServer({ mode: "public" });

@@ -36,6 +36,15 @@ const projectRoot = join(__dirname, "..");
 
 const COOKIE_NAME = "lucky_admin";
 const PRIZE_IMAGE_SIZE = 192;
+const APP_MODES = new Set(["public", "admin", "all"]);
+
+export function resolveAppMode(explicitMode, environment = process.env) {
+  const mode = explicitMode || environment.APP_MODE || (environment.RENDER === "true" ? "all" : "public");
+  if (!APP_MODES.has(mode)) {
+    throw new Error(`Invalid APP_MODE: ${mode}. Expected public, admin, or all.`);
+  }
+  return mode;
+}
 
 function setNoStoreHeaders(response) {
   response.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
@@ -53,7 +62,7 @@ export function createApp(options = {}) {
     options.uploadDir || process.env.UPLOAD_DIR || join(projectRoot, "uploads");
   const publicDir = options.publicDir || join(projectRoot, "public");
   const adminDir = options.adminDir || join(projectRoot, "admin");
-  const mode = options.mode || process.env.APP_MODE || "public";
+  const mode = resolveAppMode(options.mode);
   const publicEnabled = mode === "public" || mode === "all";
   const adminEnabled = mode === "admin" || mode === "all";
   const adminUser = options.adminUser || process.env.ADMIN_USER || "admin";
@@ -534,7 +543,7 @@ function readCookie(cookieHeader, name) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const mode = process.env.APP_MODE || "public";
+  const mode = resolveAppMode();
   const port = Number(process.env.PORT || (mode === "admin" ? 3001 : 3000));
   createApp({ mode }).listen(port, () => {
     console.log(`Lucky wheel ${mode} server is running on port ${port}`);
