@@ -123,15 +123,13 @@ export function createApp(options = {}) {
   }
 
   if (adminEnabled) {
-    app.get("/admin.html", (_request, response) => {
+    const sendAdminPage = (_request, response) => {
       setNoStoreHeaders(response);
       response.type("html").send(adminHtml);
-    });
+    };
+    app.get(["/ADMIN", "/admin.html"], sendAdminPage);
     if (!publicEnabled) {
-      app.get("/", (_request, response) => {
-        setNoStoreHeaders(response);
-        response.type("html").send(adminHtml);
-      });
+      app.get("/", sendAdminPage);
     }
     app.use(
       express.static(adminDir, {

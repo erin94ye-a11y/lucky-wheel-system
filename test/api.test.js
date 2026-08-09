@@ -72,10 +72,12 @@ test("public mode does not expose admin login page or admin APIs", async (t) => 
   const server = startTestServer({ mode: "public" });
   t.after(server.close);
 
-  const adminPage = await server.request("/admin.html", {
-    headers: { accept: "text/html" }
-  });
-  assert.equal(adminPage.status, 404);
+  for (const path of ["/ADMIN", "/admin.html"]) {
+    const adminPage = await server.request(path, {
+      headers: { accept: "text/html" }
+    });
+    assert.equal(adminPage.status, 404);
+  }
 
   const adminApi = await server.request("/api/admin/me");
   assert.equal(adminApi.status, 404);
@@ -359,7 +361,7 @@ test("admin access log UI replaces draw logs and includes an xlsx export button"
   const server = startTestServer({ mode: "admin" });
   t.after(server.close);
 
-  const adminPage = await server.request("/", {
+  const adminPage = await server.request("/ADMIN", {
     headers: { accept: "text/html" }
   });
   assert.equal(adminPage.status, 200);
