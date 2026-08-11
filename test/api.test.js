@@ -133,7 +133,11 @@ test("public H5 page hides the privacy note and ships nine fallback prize catego
   assert.match(page.body, /<h2 id="visionTitle">Our Vision<\/h2>/);
   assert.doesNotMatch(page.body, /<span>Investor Rewards Event<\/span>/);
   assert.match(page.body, /success should be shared/);
-  assert.match(page.body, /appreciation, partnership, and long-term growth/);
+  assert.match(
+    page.body,
+    /This event is not simply about rewards but about appreciation, partnership, and long term growth\./
+  );
+  assert.doesNotMatch(page.body, /rewards&mdash;it|long-term growth/);
   assert.ok(page.body.indexOf('id="resultPanel"') < page.body.indexOf('class="vision-panel"'));
   assert.match(page.body, /brand-divider/);
   assert.match(page.body, /\/assets\/jump-quantum-banner\.png/);
