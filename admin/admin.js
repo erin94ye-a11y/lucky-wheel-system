@@ -518,15 +518,16 @@ function setState(element, text, type) {
 
 function defaultPrizes() {
   return [
-    { name: "$77 USDT", probability: 0, stock: "", image_url: "" },
-    { name: "#1 Ethereum", probability: 0, stock: "", image_url: "" },
-    { name: "Thanks for playing", probability: 0, stock: "", image_url: "" },
+    { name: "21USDT", probability: 0, stock: "", image_url: "" },
+    { name: "0.1 Ethereum", probability: 0, stock: "", image_url: "" },
     { name: "Apple Mac", probability: 0, stock: "", image_url: "" },
     { name: "iPhone 17 Pro Max", probability: 0, stock: "", image_url: "" },
-    { name: "$5 Gift Card", probability: 2, stock: "", image_url: "" },
+    { name: "1 Ethereum", probability: 0, stock: "", image_url: "" },
+    { name: "77USDT", probability: 0, stock: "", image_url: "" },
+    { name: "5 Gift Card", probability: 2, stock: "", image_url: "" },
     { name: "Thanks for playing", probability: 0, stock: "", image_url: "" },
     { name: "20 shares of NVDA", probability: 0, stock: "", image_url: "" },
-    { name: "#1 oz gold", probability: 0, stock: "", image_url: "" }
+    { name: "10 Gift Card", probability: 0, stock: "", image_url: "" }
   ];
 }
 

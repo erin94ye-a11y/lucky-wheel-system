@@ -417,17 +417,18 @@ test("admin default prize examples use investor rewards with blank stock", async
   )].map((match) => ({ name: match[1], probability: Number(match[2]) }));
 
   assert.deepEqual(defaultPrizeRows, [
-    { name: "$77 USDT", probability: 0 },
-    { name: "#1 Ethereum", probability: 0 },
-    { name: "Thanks for playing", probability: 0 },
+    { name: "21USDT", probability: 0 },
+    { name: "0.1 Ethereum", probability: 0 },
     { name: "Apple Mac", probability: 0 },
     { name: "iPhone 17 Pro Max", probability: 0 },
-    { name: "$5 Gift Card", probability: 2 },
+    { name: "1 Ethereum", probability: 0 },
+    { name: "77USDT", probability: 0 },
+    { name: "5 Gift Card", probability: 2 },
     { name: "Thanks for playing", probability: 0 },
     { name: "20 shares of NVDA", probability: 0 },
-    { name: "#1 oz gold", probability: 0 }
+    { name: "10 Gift Card", probability: 0 }
   ]);
-  assert.equal((defaultPrizeBlock.match(/stock:\s*""/g) || []).length, 9);
+  assert.equal((defaultPrizeBlock.match(/stock:\s*""/g) || []).length, 10);
   assert.doesNotMatch(defaultPrizeBlock, /stock:\s*[0-9]/);
 });
 
